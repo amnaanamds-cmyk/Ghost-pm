@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { generateJson, imageBlock } from "@/lib/ai";
 import { ORGANIZER_SYSTEM, projectContext } from "@/lib/prompts";
+import { assertCanCreateTasks, recordTasks } from "@/lib/limits";
 
 const organizedTasksSchema = z
   .union([
@@ -22,12 +23,19 @@ const organizedTasksSchema = z
       .max(20)
   );
 
-/** Runs the AI organizer on a capture and stores the resulting tasks. Caller must check ownership. */
-export async function organizeCapture(captureId: string) {
+/**
+ * Runs the AI organizer on a capture and stores the resulting tasks, respecting the monthly plan limit.
+ * Caller must check ownership.
+ */
+export async function organizeCapture(captureId: string): Promise<{ created: number; dropped: number }> {
   const capture = await db.capture.findUniqueOrThrow({
     where: { id: captureId },
     include: { project: true },
   });
+  const userId = capture.project.userId;
+  // Check before calling Claude so capped users don't cost API spend.
+  await assertCanCreateTasks(userId);
+
   const openTasks = await db.task.findMany({
     where: { projectId: capture.projectId, status: { not: "done" } },
     select: { title: true },
@@ -57,8 +65,12 @@ export async function organizeCapture(captureId: string) {
 
   const tasks = await generateJson({ system: ORGANIZER_SYSTEM, content, schema: organizedTasksSchema });
 
+  // Re-check: another capture may have used quota while Claude was thinking.
+  const { remaining } = await assertCanCreateTasks(userId).catch(() => ({ remaining: 0 }));
+  const kept = tasks.slice(0, remaining);
   await db.task.createMany({
-    data: tasks.map((t) => ({ ...t, projectId: capture.projectId, captureId: capture.id })),
+    data: kept.map((t) => ({ ...t, projectId: capture.projectId, captureId: capture.id })),
   });
-  return tasks.length;
+  await recordTasks(userId, kept.length);
+  return { created: kept.length, dropped: tasks.length - kept.length };
 }

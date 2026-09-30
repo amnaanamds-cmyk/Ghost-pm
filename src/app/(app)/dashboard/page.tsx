@@ -6,9 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProjectFormDialog } from "@/components/projects/project-form-dialog";
+import { UsageMeter } from "@/components/usage-meter";
+import { getUsage } from "@/lib/limits";
 
 export default async function DashboardPage() {
   const userId = await requireUserId();
+  const usage = await getUsage(userId);
   const projects = await db.project.findMany({
     where: { userId },
     orderBy: { updatedAt: "desc" },
@@ -18,7 +21,10 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Your projects</h1>
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Your projects</h1>
+          <UsageMeter usage={usage} />
+        </div>
         <ProjectFormDialog
           trigger={
             <Button>

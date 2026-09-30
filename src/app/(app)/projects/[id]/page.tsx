@@ -12,6 +12,8 @@ import { RetryOrganizeButton } from "@/components/capture/retry-organize-button"
 import { TaskBoard } from "@/components/tasks/task-board";
 import { RoadmapPanel } from "@/components/roadmap/roadmap-panel";
 import type { RoadmapContent } from "@/lib/roadmap";
+import { getUsage } from "@/lib/limits";
+import { UsageMeter } from "@/components/usage-meter";
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -28,6 +30,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     orderBy: [{ priority: "asc" }, { createdAt: "desc" }],
     select: { id: true, title: true, why: true, priority: true, status: true, agentPrompt: true, githubIssueUrl: true },
   });
+  const usage = await getUsage(userId);
   const roadmap = await db.roadmap.findFirst({ where: { projectId: id }, orderBy: { createdAt: "desc" } });
 
   return (
@@ -67,7 +70,10 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      <CaptureBox projectId={project.id} />
+      <div className="space-y-2">
+        <CaptureBox projectId={project.id} />
+        <UsageMeter usage={usage} className="justify-end" />
+      </div>
 
       <RoadmapPanel
         projectId={project.id}

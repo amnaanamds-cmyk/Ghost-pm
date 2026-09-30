@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { requireUserId } from "@/lib/session";
 import { getOwnedProject } from "@/lib/projects";
 import { organizeCapture } from "@/lib/organize";
+import { LimitError } from "@/lib/limits";
 import { actionError, type ActionResult } from "@/lib/action-result";
 
 const captureSchema = z
@@ -23,12 +24,21 @@ const captureSchema = z
 
 export type CaptureInput = z.input<typeof captureSchema>;
 
-type OrganizeOutcome = { captureId: string; taskCount: number; aiError?: string };
+type OrganizeOutcome = {
+  captureId: string;
+  taskCount: number;
+  /** Tasks Claude suggested that didn't fit in the monthly limit. */
+  dropped?: number;
+  aiError?: string;
+  limitReached?: boolean;
+};
 
 async function runOrganizer(captureId: string): Promise<Omit<OrganizeOutcome, "captureId">> {
   try {
-    return { taskCount: await organizeCapture(captureId) };
+    const { created, dropped } = await organizeCapture(captureId);
+    return { taskCount: created, dropped, limitReached: dropped > 0 };
   } catch (e) {
+    if (e instanceof LimitError) return { taskCount: 0, aiError: e.message, limitReached: true };
     console.error("organizer failed", e);
     return { taskCount: 0, aiError: e instanceof Error ? e.message : "AI organizer failed" };
   }
@@ -49,6 +59,7 @@ export async function createCapture(projectId: string, input: CaptureInput): Pro
     const capture = await db.capture.create({ data: { projectId, text, imageUrl, source } });
     const outcome = await runOrganizer(capture.id);
     revalidatePath(`/projects/${projectId}`);
+    revalidatePath("/dashboard");
     return { ok: true, data: { captureId: capture.id, ...outcome } };
   } catch (e) {
     return actionError(e);

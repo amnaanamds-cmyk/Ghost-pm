@@ -49,8 +49,15 @@ export function CaptureBox({ projectId }: { projectId: string }) {
     startTransition(async () => {
       const res = await createCapture(projectId, { text, imageUrl: image, usedVoice });
       if (!res.ok) return void toast.error(res.error);
-      const { taskCount, aiError } = res.data;
-      if (aiError) toast.warning("Captured, but the AI organizer failed", { description: aiError });
+      const { taskCount, aiError, limitReached, dropped } = res.data;
+      const upgrade = { label: "See plans", onClick: () => window.open("/#pricing", "_blank") };
+      if (limitReached && aiError) toast.warning("Captured — monthly task limit reached", { description: aiError, action: upgrade });
+      else if (aiError) toast.warning("Captured, but the AI organizer failed", { description: aiError });
+      else if (limitReached)
+        toast.warning(`Captured → ${taskCount} task${taskCount === 1 ? "" : "s"}`, {
+          description: `${dropped} more didn't fit in your Free plan's monthly limit.`,
+          action: upgrade,
+        });
       else if (taskCount === 0) toast.info("Captured — nothing actionable found");
       else toast.success(`Captured → ${taskCount} task${taskCount === 1 ? "" : "s"}`);
       setText("");
