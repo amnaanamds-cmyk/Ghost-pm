@@ -1,12 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireUserId } from "@/lib/session";
-import { generateText, imageBlock } from "@/lib/ai";
-import { AGENT_PROMPT_SYSTEM, projectContext } from "@/lib/prompts";
+import { writeAgentPrompt } from "@/lib/agent-prompt";
+import { createIssue } from "@/lib/github";
 import { actionError, type ActionResult } from "@/lib/action-result";
 
 async function getOwnedTask(userId: string, taskId: string) {
@@ -22,33 +21,46 @@ export async function generateAgentPrompt(taskId: string): Promise<ActionResult<
   try {
     const userId = await requireUserId();
     const task = await getOwnedTask(userId, taskId);
-
-    const content: Anthropic.ContentBlockParam[] = [];
-    const img = task.capture?.imageUrl ? imageBlock(task.capture.imageUrl) : null;
-    if (img) content.push(img);
-    content.push({
-      type: "text",
-      text: [
-        "<project>",
-        projectContext(task.project),
-        "</project>",
-        "",
-        "<task>",
-        `Title: ${task.title}`,
-        `Why: ${task.why || "(not given)"}`,
-        `Priority: ${task.priority}`,
-        "</task>",
-        task.capture?.text ? `\n<original_note>\n${task.capture.text}\n</original_note>` : "",
-        img ? "\nThe attached screenshot came with the original note." : "",
-      ].join("\n"),
-    });
-
-    const agentPrompt = await generateText({ system: AGENT_PROMPT_SYSTEM, content });
-    await db.task.update({ where: { id: task.id }, data: { agentPrompt } });
+    const agentPrompt = await writeAgentPrompt(task);
     revalidatePath(`/projects/${task.projectId}`);
     return { ok: true, data: { agentPrompt } };
   } catch (e) {
     return actionError(e, "Failed to generate prompt");
+  }
+}
+
+/** Creates a GitHub issue for the task (generating the agent prompt first if needed). */
+export async function pushTaskToGitHub(taskId: string): Promise<ActionResult<{ url: string }>> {
+  try {
+    const userId = await requireUserId();
+    const task = await getOwnedTask(userId, taskId);
+    if (task.githubIssueUrl) return { ok: true, data: { url: task.githubIssueUrl } };
+    if (!task.project.githubRepo) return { ok: false, error: "Add a GitHub repo to this project first." };
+
+    const agentPrompt = task.agentPrompt ?? (await writeAgentPrompt(task));
+    const body = [
+      `**Priority:** ${task.priority}`,
+      "",
+      "## Why",
+      task.why || "_No rationale recorded._",
+      "",
+      "## Agent prompt",
+      "Paste this into Claude Code / Cursor:",
+      "",
+      "````markdown",
+      agentPrompt,
+      "````",
+      "",
+      "---",
+      "_Created by [Ghost PM](https://github.com/amnaanamds-cmyk/Ghost-pm)_",
+    ].join("\n");
+
+    const url = await createIssue(userId, task.project.githubRepo, { title: task.title, body });
+    await db.task.update({ where: { id: task.id }, data: { githubIssueUrl: url } });
+    revalidatePath(`/projects/${task.projectId}`);
+    return { ok: true, data: { url } };
+  } catch (e) {
+    return actionError(e, "Failed to create GitHub issue");
   }
 }
 

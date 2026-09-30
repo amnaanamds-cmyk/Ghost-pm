@@ -66,7 +66,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
       <CaptureBox projectId={project.id} />
 
-      <TaskBoard tasks={tasks} />
+      <TaskBoard tasks={tasks} githubRepo={project.githubRepo} />
 
       {captures.length > 0 && (
         <section className="space-y-2">

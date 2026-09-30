@@ -19,15 +19,10 @@ import { updateTask } from "@/app/actions/tasks";
 import { cn } from "@/lib/utils";
 import { PriorityBadge } from "./priority-badge";
 import { TaskDialog } from "./task-dialog";
+import { GitHubButton } from "./github-button";
 import { PRIORITIES, STATUSES, type TaskView } from "./types";
 
-export function TaskBoard({
-  tasks,
-  renderExtraActions,
-}: {
-  tasks: TaskView[];
-  renderExtraActions?: (task: TaskView) => React.ReactNode;
-}) {
+export function TaskBoard({ tasks, githubRepo }: { tasks: TaskView[]; githubRepo: string | null }) {
   const dndId = useId(); // stable id so dnd-kit aria attributes match between SSR and client
   const [filter, setFilter] = useState<Set<Priority>>(new Set());
   const [openId, setOpenId] = useState<string | null>(null);
@@ -110,7 +105,9 @@ export function TaskBoard({
           task={openTask}
           open
           onOpenChange={(o) => !o && setOpenId(null)}
-          extraActions={renderExtraActions?.(openTask)}
+          extraActions={
+            githubRepo ? <GitHubButton taskId={openTask.id} issueUrl={openTask.githubIssueUrl} /> : undefined
+          }
         />
       )}
     </section>
