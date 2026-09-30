@@ -10,6 +10,8 @@ import { CaptureBox } from "@/components/capture/capture-box";
 import { db } from "@/lib/db";
 import { RetryOrganizeButton } from "@/components/capture/retry-organize-button";
 import { TaskBoard } from "@/components/tasks/task-board";
+import { RoadmapPanel } from "@/components/roadmap/roadmap-panel";
+import type { RoadmapContent } from "@/lib/roadmap";
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -26,6 +28,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     orderBy: [{ priority: "asc" }, { createdAt: "desc" }],
     select: { id: true, title: true, why: true, priority: true, status: true, agentPrompt: true, githubIssueUrl: true },
   });
+  const roadmap = await db.roadmap.findFirst({ where: { projectId: id }, orderBy: { createdAt: "desc" } });
 
   return (
     <div className="space-y-6">
@@ -65,6 +68,18 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       </div>
 
       <CaptureBox projectId={project.id} />
+
+      <RoadmapPanel
+        projectId={project.id}
+        openTaskCount={tasks.filter((t) => t.status !== "done").length}
+        roadmap={
+          roadmap && {
+            weekStart: roadmap.weekStart.toISOString(),
+            createdAt: roadmap.createdAt.toISOString(),
+            content: roadmap.content as RoadmapContent,
+          }
+        }
+      />
 
       <TaskBoard tasks={tasks} githubRepo={project.githubRepo} />
 
