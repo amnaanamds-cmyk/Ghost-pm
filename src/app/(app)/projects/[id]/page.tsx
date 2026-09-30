@@ -6,11 +6,19 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ProjectFormDialog } from "@/components/projects/project-form-dialog";
 import { DeleteProjectButton } from "@/components/projects/delete-project-button";
+import { CaptureBox } from "@/components/capture/capture-box";
+import { db } from "@/lib/db";
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const userId = await requireUserId();
   const project = await getOwnedProject(userId, id);
+  const captures = await db.capture.findMany({
+    where: { projectId: id },
+    orderBy: { createdAt: "desc" },
+    take: 5,
+    select: { id: true, text: true, source: true, createdAt: true, imageUrl: true },
+  });
 
   return (
     <div className="space-y-6">
@@ -48,6 +56,22 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           </div>
         </div>
       </div>
+
+      <CaptureBox projectId={project.id} />
+
+      {captures.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-muted-foreground text-sm font-medium">Recent captures</h2>
+          <ul className="space-y-2">
+            {captures.map((c) => (
+              <li key={c.id} className="flex items-start gap-3 rounded-md border p-3 text-sm">
+                <Badge variant="outline">{c.source}</Badge>
+                <span className="line-clamp-2 flex-1">{c.text || (c.imageUrl ? "Screenshot" : "")}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }
