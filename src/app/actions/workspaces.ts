@@ -10,6 +10,7 @@ import { requireUserId } from "@/lib/session";
 import { appUrl } from "@/lib/url";
 import { WORKSPACE_COOKIE, assertRole, requireWorkspace, ForbiddenError } from "@/lib/workspace";
 import { actionError, type ActionResult } from "@/lib/action-result";
+import { effectivePlan, syncSeats } from "@/lib/billing";
 
 const INVITE_TTL_DAYS = 7;
 const nameSchema = z.string().trim().min(1, "Name is required").max(60);
@@ -68,7 +69,9 @@ export async function deleteWorkspace(): Promise<ActionResult> {
     const { workspace, membership } = await requireWorkspace();
     assertRole(membership, "OWNER");
     if (workspace.personal) return { ok: false, error: "Your personal workspace can't be deleted." };
-    if (workspace.plan === "PRO") return { ok: false, error: "Cancel the Pro subscription before deleting." };
+    if (effectivePlan(workspace) === "PRO" && workspace.subscriptionStatus !== "cancelled") {
+      return { ok: false, error: "Cancel the Pro subscription (Settings → Billing) before deleting." };
+    }
     await db.workspace.delete({ where: { id: workspace.id } });
     (await cookies()).delete(WORKSPACE_COOKIE);
     revalidatePath("/", "layout");
@@ -143,6 +146,7 @@ export async function acceptInvite(token: string): Promise<ActionResult<{ worksp
       if (claimed.count === 0 && !existing) throw new Error("This invite was just used by someone else.");
     });
     await setCurrentWorkspace(invite.workspaceId);
+    await syncSeats(invite.workspaceId);
     revalidatePath("/", "layout");
     return { ok: true, data: { workspaceId: invite.workspaceId } };
   } catch (e) {
@@ -194,6 +198,7 @@ export async function removeMember(membershipId: string): Promise<ActionResult> 
       db.membership.delete({ where: { id: target.id } }),
     ]);
     if (self) (await cookies()).delete(WORKSPACE_COOKIE);
+    await syncSeats(workspace.id);
     revalidatePath("/", "layout");
     return { ok: true };
   } catch (e) {

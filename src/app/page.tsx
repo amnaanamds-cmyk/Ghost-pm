@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FREE_TASK_LIMIT } from "@/lib/limits";
+import { PRO_PRICE_PER_SEAT } from "@/lib/billing";
 
 const features = [
   {
@@ -88,18 +89,23 @@ export default async function Home() {
               <PlanCard
                 name="Free"
                 price="$0"
-                features={[`${FREE_TASK_LIMIT} AI tasks / month`, "Unlimited projects", "Agent prompt generator", "Weekly roadmap", "GitHub issue sync"]}
+                features={[`${FREE_TASK_LIMIT} AI tasks / month`, "Unlimited projects & teammates", "Agent prompt generator", "Weekly roadmap", "GitHub issue sync"]}
                 action={cta}
               />
               <PlanCard
                 name="Pro"
-                price="$12"
+                price={`$${PRO_PRICE_PER_SEAT}`}
+                unit="/seat/mo"
                 highlight
-                features={["Unlimited AI tasks", "Everything in Free", "Priority support", "Early access to new features"]}
+                features={["Unlimited AI tasks", "Everything in Free", "Team workspaces & roles", "Priority support"]}
                 action={
-                  <Button size="lg" disabled className="w-full">
-                    Coming soon
-                  </Button>
+                  signedIn ? (
+                    <Button asChild size="lg">
+                      <Link href="/settings/billing">Upgrade to Pro</Link>
+                    </Button>
+                  ) : (
+                    <SignInButton size="lg" label="Start free, upgrade anytime" />
+                  )
                 }
               />
             </div>
@@ -118,12 +124,14 @@ export default async function Home() {
 function PlanCard({
   name,
   price,
+  unit = "/mo",
   features,
   action,
   highlight,
 }: {
   name: string;
   price: string;
+  unit?: string;
   features: string[];
   action: React.ReactNode;
   highlight?: boolean;
@@ -134,7 +142,7 @@ function PlanCard({
         <h3 className="font-semibold">{name}</h3>
         <p className="mt-2">
           <span className="text-4xl font-bold">{price}</span>
-          <span className="text-muted-foreground">/mo</span>
+          <span className="text-muted-foreground">{unit}</span>
         </p>
       </div>
       <ul className="flex-1 space-y-2 text-sm">

@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { effectivePlan } from "@/lib/billing";
 
 export const FREE_TASK_LIMIT = Number(process.env.FREE_TASKS_PER_MONTH) || 20;
 
@@ -18,9 +19,9 @@ export async function getUsage(workspaceId: string): Promise<Usage> {
   });
   const ws = await db.workspace.findUniqueOrThrow({
     where: { id: workspaceId },
-    select: { plan: true, tasksThisPeriod: true },
+    select: { plan: true, tasksThisPeriod: true, subscriptionStatus: true, currentPeriodEnd: true },
   });
-  if (ws.plan === "PRO") return { plan: "PRO", used: ws.tasksThisPeriod, limit: null, remaining: Infinity };
+  if (effectivePlan(ws) === "PRO") return { plan: "PRO", used: ws.tasksThisPeriod, limit: null, remaining: Infinity };
   return {
     plan: "FREE",
     used: ws.tasksThisPeriod,

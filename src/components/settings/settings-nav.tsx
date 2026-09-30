@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/settings/workspace", label: "Workspace" },
+  { href: "/settings/billing", label: "Billing" },
 ];
 
 export function SettingsNav() {

@@ -17,7 +17,7 @@ export function UsageMeter({ usage, className }: { usage: Usage; className?: str
         {usage.used}/{usage.limit} tasks this month
       </span>
       {usage.remaining <= 5 && (
-        <Link href="/#pricing" className="font-medium underline-offset-4 hover:underline">
+        <Link href="/settings/billing" className="font-medium underline-offset-4 hover:underline">
           Upgrade
         </Link>
       )}

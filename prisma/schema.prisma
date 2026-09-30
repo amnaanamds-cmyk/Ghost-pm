@@ -75,15 +75,25 @@ enum Role {
 }
 
 model Workspace {
-  id              String   @id @default(cuid())
+  id              String  @id @default(cuid())
   name            String
-  personal        Boolean  @default(false)
-  plan            Plan     @default(FREE)
+  personal        Boolean @default(false)
+  plan            Plan    @default(FREE)
   // Monthly AI-task usage for plan limits. Deleting tasks doesn't refund quota.
   usagePeriod     String? // "YYYY-MM" (UTC)
-  tasksThisPeriod Int      @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  tasksThisPeriod Int     @default(0)
+
+  // Lemon Squeezy billing (per-seat Pro). Kept in sync by the webhook.
+  lsCustomerId         String?
+  lsSubscriptionId     String?   @unique
+  lsSubscriptionItemId String?
+  subscriptionStatus   String? // on_trial | active | past_due | paused | unpaid | cancelled | expired
+  seats                Int       @default(1)
+  currentPeriodEnd     DateTime? // renews_at, or ends_at once cancelled
+  billingUpdatedAt     DateTime? // subscription.updated_at of the last applied event (ignore older ones)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   members  Membership[]
   invites  Invite[]
@@ -207,4 +217,17 @@ model Roadmap {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId, weekStart])
+}
+
+// Raw billing webhooks, for auditing and debugging.
+model WebhookEvent {
+  id          String    @id @default(cuid())
+  provider    String
+  eventName   String
+  payload     Json
+  error       String?
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([provider, createdAt])
 }

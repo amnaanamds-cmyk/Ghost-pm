@@ -50,7 +50,7 @@ export function CaptureBox({ projectId }: { projectId: string }) {
       const res = await createCapture(projectId, { text, imageUrl: image, usedVoice });
       if (!res.ok) return void toast.error(res.error);
       const { taskCount, aiError, limitReached, dropped } = res.data;
-      const upgrade = { label: "See plans", onClick: () => window.open("/#pricing", "_blank") };
+      const upgrade = { label: "See plans", onClick: () => (window.location.href = "/settings/billing") };
       if (limitReached && aiError) toast.warning("Captured — monthly task limit reached", { description: aiError, action: upgrade });
       else if (aiError) toast.warning("Captured, but the AI organizer failed", { description: aiError });
       else if (limitReached)
