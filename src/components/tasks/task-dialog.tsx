@@ -1,9 +1,13 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Loader2, Sparkles, Trash2 } from "lucide-react";
+import { Loader2, Pencil, Sparkles, Square, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { deleteTask, generateAgentPrompt, updateTask } from "@/app/actions/tasks";
+import { deleteTask, updateTask } from "@/app/actions/tasks";
+import { useStreamedPrompt } from "@/hooks/use-streamed-prompt";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { TaskComments } from "./task-comments";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/copy-button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -27,18 +31,28 @@ export function TaskDialog({
   onOpenChange: (open: boolean) => void;
   extraActions?: React.ReactNode;
 }) {
-  const [generating, startGenerating] = useTransition();
   const [saving, startSaving] = useTransition();
-  // Local copy so a fresh prompt shows instantly, before the server re-render lands.
-  const [prompt, setPrompt] = useState<string | null>(null);
-  const agentPrompt = prompt ?? task.agentPrompt;
+  const [editing, setEditing] = useState(false);
+  const stream = useStreamedPrompt(task.id);
+  const generating = stream.streaming;
+  // Show the live/just-finished stream until the server re-render catches up.
+  const agentPrompt = stream.text ?? task.agentPrompt;
 
-  function generate() {
-    startGenerating(async () => {
-      const res = await generateAgentPrompt(task.id);
+  async function generate() {
+    const res = await stream.start();
+    if (!res.ok) {
+      stream.reset();
+      if (res.error !== "Cancelled") toast.error(res.error);
+    } else toast.success("Agent prompt ready");
+  }
+
+  function saveEdits(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    startSaving(async () => {
+      const res = await updateTask(task.id, { title: String(fd.get("title") ?? ""), why: String(fd.get("why") ?? "") });
       if (!res.ok) return void toast.error(res.error);
-      setPrompt(res.data.agentPrompt);
-      toast.success("Agent prompt ready");
+      setEditing(false);
     });
   }
 
@@ -53,11 +67,32 @@ export function TaskDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <div className="flex items-center gap-2 pr-6">
-            <PriorityBadge priority={task.priority} />
-            <DialogTitle className="leading-snug">{task.title}</DialogTitle>
-          </div>
-          <DialogDescription className="whitespace-pre-wrap">{task.why || "No rationale recorded."}</DialogDescription>
+          {editing ? (
+            <form onSubmit={saveEdits} className="grid gap-2 pr-6">
+              <DialogTitle className="sr-only">Edit task</DialogTitle>
+              <Input name="title" defaultValue={task.title} maxLength={200} required aria-label="Title" autoFocus />
+              <Textarea name="why" defaultValue={task.why} maxLength={2000} rows={3} aria-label="Why" placeholder="Why does this matter?" />
+              <div className="flex gap-2">
+                <Button type="submit" size="sm" disabled={saving}>
+                  {saving && <Loader2 className="animate-spin" />} Save
+                </Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <>
+              <div className="flex items-start gap-2 pr-6">
+                <PriorityBadge priority={task.priority} className="mt-1" />
+                <DialogTitle className="flex-1 leading-snug">{task.title}</DialogTitle>
+                <Button variant="ghost" size="icon" className="size-7" onClick={() => setEditing(true)} aria-label="Edit task">
+                  <Pencil className="size-3.5" />
+                </Button>
+              </div>
+              <DialogDescription className="whitespace-pre-wrap">{task.why || "No rationale recorded."}</DialogDescription>
+            </>
+          )}
         </DialogHeader>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -126,21 +161,31 @@ export function TaskDialog({
             <h3 className="text-sm font-medium">Agent prompt</h3>
             <div className="flex gap-2">
               {agentPrompt && !generating && <CopyButton text={agentPrompt} />}
-              <Button size="sm" variant={agentPrompt ? "outline" : "default"} onClick={generate} disabled={generating}>
-                {generating ? <Loader2 className="animate-spin" /> : <Sparkles />}
-                {generating ? "Writing…" : agentPrompt ? "Regenerate" : "Generate agent prompt"}
-              </Button>
+              {generating ? (
+                <Button size="sm" variant="outline" onClick={() => stream.stop()}>
+                  <Square /> Writing… stop
+                </Button>
+              ) : (
+                <Button size="sm" variant={agentPrompt ? "outline" : "default"} onClick={generate}>
+                  <Sparkles />
+                  {agentPrompt ? "Regenerate" : "Generate agent prompt"}
+                </Button>
+              )}
             </div>
           </div>
-          {generating ? (
+          {generating && !stream.text ? (
             <div className="space-y-2 rounded-md border p-4">
               {Array.from({ length: 6 }).map((_, i) => (
                 <Skeleton key={i} className="h-4" style={{ width: `${90 - i * 9}%` }} />
               ))}
             </div>
           ) : agentPrompt ? (
-            <pre className="bg-muted max-h-[45vh] overflow-auto rounded-md border p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap">
+            <pre
+              data-agent-prompt
+              className="bg-muted max-h-[45vh] overflow-auto rounded-md border p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap"
+            >
               {agentPrompt}
+              {generating && <span className="bg-foreground ml-0.5 inline-block h-3 w-1.5 animate-pulse align-middle" />}
             </pre>
           ) : (
             <p className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
@@ -148,6 +193,10 @@ export function TaskDialog({
               acceptance criteria and guardrails.
             </p>
           )}
+        </div>
+
+        <div className="border-t pt-4">
+          <TaskComments taskId={task.id} />
         </div>
       </DialogContent>
     </Dialog>

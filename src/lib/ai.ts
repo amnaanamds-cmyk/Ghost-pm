@@ -92,6 +92,25 @@ export async function generateText(opts: {
   return text;
 }
 
+/** Streams a plain-text reply. Iterate `textStream()`-style via the returned MessageStream. */
+export function streamText(opts: { system: string; content: string | Anthropic.ContentBlockParam[]; maxTokens?: number }) {
+  return getClient().messages.stream({
+    model: model(),
+    max_tokens: opts.maxTokens ?? 8000,
+    system: opts.system,
+    messages: [{ role: "user", content: opts.content }],
+  });
+}
+
+/** Maps SDK errors to user-facing messages. */
+export function describeAIError(e: unknown): string {
+  if (e instanceof AIError) return e.message;
+  if (e instanceof Anthropic.AuthenticationError) return "Invalid ANTHROPIC_API_KEY.";
+  if (e instanceof Anthropic.RateLimitError) return "Claude is rate limited — try again in a minute.";
+  if (e instanceof Anthropic.APIError) return `Claude API error (${e.status ?? "network"}).`;
+  return e instanceof Error ? e.message : "AI request failed";
+}
+
 /** Convert a stored data URL into a Claude image block. */
 export function imageBlock(dataUrl: string): Anthropic.ImageBlockParam | null {
   const m = dataUrl.match(/^data:(image\/(?:png|jpeg|gif|webp));base64,(.+)$/);

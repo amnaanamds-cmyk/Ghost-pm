@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FolderPlus, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireWorkspace } from "@/lib/workspace";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProjectFormDialog } from "@/components/projects/project-form-dialog";
 import { UsageMeter } from "@/components/usage-meter";
+import { Onboarding } from "@/components/onboarding";
 import { getUsage } from "@/lib/limits";
 
 export default async function DashboardPage() {
@@ -35,16 +36,7 @@ export default async function DashboardPage() {
       </div>
 
       {projects.length === 0 ? (
-        <Card className="items-center border-dashed py-12 text-center">
-          <FolderPlus className="text-muted-foreground size-10" />
-          <div className="space-y-1 px-6">
-            <p className="font-medium">No projects yet</p>
-            <p className="text-muted-foreground text-sm">
-              Create a project, describe your stack, then start dumping ideas and bugs into it.
-            </p>
-          </div>
-          <ProjectFormDialog trigger={<Button>Create your first project</Button>} />
-        </Card>
+        <Onboarding createButton={<ProjectFormDialog trigger={<Button>Create your first project</Button>} />} />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((p) => (

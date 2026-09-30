@@ -3,6 +3,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { generateJson, imageBlock } from "@/lib/ai";
+import { loadImageDataUrl } from "@/lib/storage";
 import { ORGANIZER_SYSTEM, projectContext } from "@/lib/prompts";
 import { assertCanCreateTasks, recordTasks } from "@/lib/limits";
 
@@ -44,7 +45,8 @@ export async function organizeCapture(captureId: string): Promise<{ created: num
   });
 
   const content: Anthropic.ContentBlockParam[] = [];
-  const img = capture.imageUrl ? imageBlock(capture.imageUrl) : null;
+  const dataUrl = capture.imageUrl ? await loadImageDataUrl(capture.imageUrl) : null;
+  const img = dataUrl ? imageBlock(dataUrl) : null;
   if (img) content.push(img);
   content.push({
     type: "text",

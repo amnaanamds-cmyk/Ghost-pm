@@ -101,11 +101,22 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         }
       />
 
-      <TaskBoard tasks={tasks} githubRepo={project.githubRepo} members={members.map((m) => m.user)} />
+      <TaskBoard
+        projectId={project.id}
+        tasks={tasks}
+        githubRepo={project.githubRepo}
+        members={members.map((m) => m.user)}
+        currentUserId={userId}
+      />
 
       {captures.length > 0 && (
         <section className="space-y-2">
-          <h2 className="text-muted-foreground text-sm font-medium">Recent captures</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-muted-foreground text-sm font-medium">Recent captures</h2>
+            <Link href={`/projects/${project.id}/captures`} className="text-muted-foreground hover:text-foreground text-xs">
+              View all →
+            </Link>
+          </div>
           <ul className="space-y-2">
             {captures.map((c) => (
               <li key={c.id} className="flex items-start gap-3 rounded-md border p-3 text-sm">

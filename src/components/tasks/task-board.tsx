@@ -21,17 +21,27 @@ import { PriorityBadge } from "./priority-badge";
 import { TaskDialog } from "./task-dialog";
 import { GitHubButton } from "./github-button";
 import { PRIORITIES, STATUSES, type Person, type TaskView } from "./types";
+import { Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { NewTaskDialog } from "./new-task-dialog";
+import { BoardActions } from "./board-actions";
 import { Avatar } from "@/components/avatar";
 
 export function TaskBoard({
+  projectId,
   tasks,
   githubRepo,
   members,
+  currentUserId,
 }: {
+  projectId: string;
   tasks: TaskView[];
   githubRepo: string | null;
   members: Person[];
+  currentUserId: string;
 }) {
+  const [query, setQuery] = useState("");
+  const [mine, setMine] = useState(false);
   const dndId = useId(); // stable id so dnd-kit aria attributes match between SSR and client
   const [filter, setFilter] = useState<Set<Priority>>(new Set());
   const [openId, setOpenId] = useState<string | null>(null);
@@ -57,14 +67,46 @@ export function TaskBoard({
     });
   }
 
-  const visible = optimisticTasks.filter((t) => filter.size === 0 || filter.has(t.priority));
+  const q = query.trim().toLowerCase();
+  const visible = optimisticTasks.filter(
+    (t) =>
+      (filter.size === 0 || filter.has(t.priority)) &&
+      (!mine || t.assignee?.id === currentUserId) &&
+      (!q || t.title.toLowerCase().includes(q) || t.why.toLowerCase().includes(q))
+  );
   const openTask = tasks.find((t) => t.id === openId);
 
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-semibold">Board</h2>
-        <div className="flex items-center gap-1" role="group" aria-label="Filter by priority">
+        <div className="flex items-center gap-2">
+          <h2 className="font-semibold">Board</h2>
+          <NewTaskDialog projectId={projectId} />
+        </div>
+        <BoardActions projectId={projectId} hasRepo={!!githubRepo} />
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-40 flex-1 sm:max-w-xs">
+          <Search className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search tasks"
+            aria-label="Search tasks"
+            className="h-8 pl-8"
+          />
+        </div>
+        <button
+          aria-pressed={mine}
+          onClick={() => setMine((m) => !m)}
+          className={cn(
+            "h-8 rounded-md border px-3 text-xs font-medium",
+            mine ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+          )}
+        >
+          Assigned to me
+        </button>
+        <div className="flex items-center gap-1 sm:ml-auto" role="group" aria-label="Filter by priority">
           {PRIORITIES.map((p) => (
             <button
               key={p}

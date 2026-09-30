@@ -2,9 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { createProject, updateProject, type ProjectInput } from "@/app/actions/projects";
+import { createProject, listMyRepos, updateProject, type ProjectInput } from "@/app/actions/projects";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,7 +27,18 @@ type Props = {
 export function ProjectFormDialog({ trigger, project }: Props) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
+  const [loadingRepos, startLoadingRepos] = useTransition();
+  const [repos, setRepos] = useState<{ fullName: string; private: boolean }[] | null>(null);
   const router = useRouter();
+
+  function loadRepos() {
+    startLoadingRepos(async () => {
+      const res = await listMyRepos();
+      if (!res.ok) return void toast.error(res.error);
+      setRepos(res.data);
+      if (res.data.length === 0) toast.info("No repos with issues enabled found on your GitHub account");
+    });
+  }
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     // onSubmit (not form action) so React doesn't reset the fields when validation fails.
@@ -91,12 +102,30 @@ export function ProjectFormDialog({ trigger, project }: Props) {
           </div>
           <div className="grid gap-2">
             <Label htmlFor="githubRepo">GitHub repo (optional)</Label>
-            <Input
-              id="githubRepo"
-              name="githubRepo"
-              defaultValue={project?.githubRepo ?? ""}
-              placeholder="owner/repo"
-            />
+            <div className="flex gap-2">
+              <Input
+                id="githubRepo"
+                name="githubRepo"
+                list="repo-options"
+                autoComplete="off"
+                defaultValue={project?.githubRepo ?? ""}
+                placeholder="owner/repo"
+              />
+              <Button type="button" variant="outline" onClick={loadRepos} disabled={loadingRepos} title="Load my GitHub repos">
+                {loadingRepos ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+                <span className="hidden sm:inline">{repos ? "Reload" : "My repos"}</span>
+              </Button>
+            </div>
+            <datalist id="repo-options">
+              {repos?.map((r) => (
+                <option key={r.fullName} value={r.fullName}>
+                  {r.private ? "private" : "public"}
+                </option>
+              ))}
+            </datalist>
+            {repos && repos.length > 0 && (
+              <p className="text-muted-foreground text-xs">{repos.length} repos loaded — start typing to pick one.</p>
+            )}
           </div>
           <DialogFooter>
             <Button type="submit" disabled={pending}>
