@@ -2,94 +2,110 @@
 
 **The product manager for your AI coding agents.**
 
-Dump messy ideas, bug reports, voice notes and screenshots. Ghost PM (powered by Claude) turns them into prioritized tasks, writes paste-ready prompts for Claude Code / Cursor, plans your week, and pushes tasks to GitHub issues.
+Dump messy ideas, bug reports, voice notes and screenshots. Ghost PM (powered by Claude) turns them into prioritized tasks, writes paste-ready prompts for Claude Code / Cursor, plans your week, and syncs with GitHub issues — for solo builders and teams.
 
 ## Features
 
-- **Dump anything:** one box for text, pasted or uploaded screenshots, and voice-to-text (browser Web Speech API, free).
-- **AI organizer:** each capture becomes one or more tasks, each with a title, a "why" and a priority from P0 to P3.
-- **Agent prompt generator:** a detailed prompt for each task covering the goal, context, likely files, steps, acceptance criteria and what *not* to change, with one-click copy.
-- **Kanban board:** columns for todo, doing and done. You can drag cards between columns and filter by priority.
-- **GitHub sync:** creates an issue from a task, with the "why" and the agent prompt in the body. It uses the token from your GitHub login.
-- **Plan my week:** Claude sorts open tasks into three buckets: build this week (max 5), later, and ignore. Each task gets a one-line reason.
-- **Plans:** the Free plan allows 20 AI-created tasks per month. Pro ($12/mo) is UI only; there are no payments yet.
+**Core**
+- **Dump anything:** one box for text, pasted or dropped screenshots, and voice (the browser's Web Speech API).
+- **AI organizer:** one messy note becomes several prioritized tasks (P0–P3), each with a "why". Claude returns JSON; it's validated with zod and retried once if invalid. Screenshots are sent to Claude as images.
+- **Agent prompt generator:** streams a detailed prompt for Claude Code or Cursor, covering goal, context, likely files, steps, acceptance criteria and what *not* to change. One click copies it.
+- **Kanban board:** drag cards between columns, search, filter by priority or "assigned to me", add tasks by hand, and edit them inline.
+- **Plan my week:** Claude picks up to 5 tasks to build now, plus what to do later and what to ignore, with a reason for each.
+- **GitHub:** a repo picker, "Push to GitHub" to create an issue with the agent prompt in it, and a sync that marks tasks done when their issue closes.
+- **Collaboration:** comments on tasks, capture history, and CSV/Markdown export.
+
+**Teams & billing**
+- **Workspaces:** each user gets a personal workspace and can create team workspaces, with roles (owner, admin, member).
+- **Invites:** single-use invite links that expire, optionally sent by email.
+- **Pro plan:** $12 per seat per month through **Lemon Squeezy** (merchant of record, so it handles sales tax and VAT). Seat count follows membership automatically, and a signed webhook keeps the plan in sync.
+- **Free plan:** 20 AI-created tasks per month per workspace. Tasks you add by hand are always free.
+
+**Trust & operations**
+- **Legal pages:** Terms and Privacy, plus JSON data export and self-serve account deletion (GDPR access, portability and erasure).
+- **Admin dashboard:** KPIs, MRR, comping Pro, resetting usage, and failed webhooks.
+- **Security:**
+  - GitHub tokens are encrypted at rest (AES-256-GCM).
+  - Rate limits are stored in Postgres.
+  - Headers include CSP, HSTS and frame-ancestors.
+  - Screenshots live in a private bucket and are served only to workspace members.
+- **Optional integrations:** Cloudflare R2 or S3 for screenshots, Resend for email (welcome, invites, weekly digest with one-click unsubscribe), and Sentry for errors with user content excluded.
+- **Deployment:** a Docker image with migrations applied on start and a health check, a Vercel config with crons, and GitHub Actions CI.
+
+Every integration is **optional**. The app runs with just Postgres, GitHub OAuth and an Anthropic key, and each feature switches on when its env vars are set.
 
 ## Stack
 
-Next.js 15 (App Router, TypeScript) · Tailwind v4 · shadcn/ui · Prisma + Postgres · Auth.js (GitHub OAuth) · Anthropic SDK · dnd-kit
+Next.js 15 (App Router, TypeScript) · Tailwind v4 · shadcn/ui · Prisma + Postgres · Auth.js (GitHub OAuth) · Anthropic SDK · dnd-kit · Lemon Squeezy · Resend · Sentry · S3/R2 · Vitest · Playwright
 
-## Setup
+## Quick start (local)
 
-### 1. Prerequisites
-
-- Node.js 20+
-- A Postgres database. For example, run one locally with Docker:
-  ```bash
-  docker run -d --name ghostpm-db -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=ghostpm -p 5432:5432 postgres:16
-  ```
-
-### 2. Install
+**Prerequisites:** Node.js 22+ and Postgres 16. The easiest way to get Postgres is `docker compose up -d db`.
 
 ```bash
-npm install          # also runs `prisma generate`
-cp .env.example .env
+npm install                # also runs `prisma generate`
+cp .env.example .env       # then fill in the required values below
+npm run db:migrate         # create tables
+npm run dev                # http://localhost:3000
 ```
 
-### 3. Configure `.env`
+### Required environment variables
 
-| Variable | What it is |
+| Variable | Notes |
 | --- | --- |
 | `DATABASE_URL` | Postgres connection string |
-| `AUTH_SECRET` | Random secret. Generate one with `npx auth secret` or `openssl rand -base64 32` |
-| `AUTH_URL` | Public URL of the app (`http://localhost:3000` in dev) |
-| `AUTH_TRUST_HOST` | `true` (needed behind proxies / on most hosts) |
-| `AUTH_GITHUB_ID` / `AUTH_GITHUB_SECRET` | GitHub OAuth App credentials (see below) |
-| `ANTHROPIC_API_KEY` | Your Anthropic API key: https://console.anthropic.com |
-| `ANTHROPIC_MODEL` | Claude model ID, e.g. `claude-opus-5-5` |
-| `FREE_TASKS_PER_MONTH` | Free-plan monthly task limit (default `20`) |
-| `GITHUB_API_URL` | *Optional.* Set this only for GitHub Enterprise Server |
+| `AUTH_SECRET` | `npx auth secret` or `openssl rand -base64 32` |
+| `AUTH_URL` | `http://localhost:3000` locally; your public URL in production |
+| `AUTH_GITHUB_ID` / `AUTH_GITHUB_SECRET` | GitHub OAuth App ([create one](https://github.com/settings/developers)). Callback URL: `<AUTH_URL>/api/auth/callback/github` |
+| `ANTHROPIC_API_KEY` | From the [Anthropic Console](https://console.anthropic.com) |
+| `ANTHROPIC_MODEL` | For example `claude-opus-5-5` |
 
-**GitHub OAuth App:** go to https://github.com/settings/developers and choose **New OAuth App**:
-- Homepage URL: `http://localhost:3000`
-- Authorization callback URL: `http://localhost:3000/api/auth/callback/github`
-
-Copy the Client ID and a newly generated Client Secret into `.env`. The app requests the `repo` scope so it can create issues on your private repos.
-
-### 4. Create the database tables
-
-```bash
-npm run db:migrate    # dev: applies migrations (prisma migrate dev)
-# production: npm run db:deploy
-```
-
-### 5. Run
-
-```bash
-npm run dev
-```
-
-Open http://localhost:3000 and sign in with GitHub.
+Everything else is optional: billing, storage, email, Sentry, legal details and admin access. `.env.example` documents every variable, and **[docs/DEPLOY.md](docs/DEPLOY.md)** walks through setting up each service.
 
 ## Scripts
 
-| Script | Does |
+| Script | What it does |
 | --- | --- |
 | `npm run dev` | Dev server |
 | `npm run build` / `npm start` | Production build / server |
 | `npm run lint` / `npm run typecheck` | ESLint / TypeScript |
-| `npm run db:migrate` / `npm run db:deploy` | Prisma migrations (dev / prod) |
+| `npm test` | Unit + integration tests (Vitest; needs Postgres, uses `ghostpm_test`) |
+| `npm run test:e2e` | Playwright end-to-end tests against the production build (run `npm run build` first; uses `ghostpm_e2e` and a local mock of Claude/GitHub) |
+| `npm run db:migrate` / `npm run db:deploy` | Prisma migrations (dev / production) |
 
-## How it works
+## Architecture
 
-- **Server actions** (`src/app/actions/*`) handle every mutation. They check ownership on every call.
-- **AI** (`src/lib/ai.ts`): Claude is asked for JSON only. Replies are validated with zod. If a reply is invalid, Claude is retried once and shown its own reply plus the validation error. Screenshots are sent as base64 image blocks.
-- **Captures are always saved,** even if the AI call fails. A capture with no tasks shows an **Organize** button so you can retry.
-- **Plan limits** (`src/lib/limits.ts`): a monthly counter on each user. Deleting tasks does not refund quota. The limit is checked *before* calling Claude, so users who are over the cap cost nothing.
-- **Screenshots** are downscaled in the browser (max 1568px) and stored as base64 data URLs in Postgres. This keeps v1 simple; move them to object storage later.
-- **Voice** uses the browser's Web Speech API. It works in Chrome, Edge and Safari; in other browsers the mic button is disabled.
+```
+src/
+  app/
+    (app)/            signed-in app: dashboard, projects, settings, admin
+    (legal)/          terms, privacy
+    actions/          server actions — every mutation, each one auth-checked
+    api/              route handlers: streaming prompts, exports, images, webhooks, crons, health
+    invite/[token]/   invite accept page
+  lib/
+    ai.ts             Claude client: JSON generation with zod + one retry, streaming
+    organize.ts       capture → tasks (respects plan limits)
+    workspace.ts      membership-based access control and roles
+    billing.ts        Lemon Squeezy checkout/portal/seats + webhook state machine
+    limits.ts         per-workspace monthly usage
+    rate-limit.ts     Postgres fixed-window rate limiter
+    storage.ts        S3/R2 or Postgres screenshot storage
+    email.ts          Resend + templates; digest.ts for the weekly digest
+    crypto.ts         AES-256-GCM for OAuth tokens
+prisma/               schema + migrations
+tests/                Vitest unit & integration tests
+e2e/                  Playwright tests + mock server
+```
 
-## Known limitations (v1)
+How it works:
+- **Access control:** every project, task, capture and comment is reached through a workspace membership check. Roles decide admin actions: admins invite and remove people, owners manage billing and roles.
+- **Plan limits:** a per-workspace monthly counter that is updated atomically and is aware of the billing period. It's checked before Claude is called, so a capped workspace costs nothing.
+- **Billing state:** it comes only from signed webhooks. Out-of-order events are ignored, and `effectivePlan()` guards against a missed expiry webhook.
+- **Errors:** `UserError` subclasses carry messages that are safe to show. Anything else is reported to Sentry and shown to the user as a generic message.
 
-- There are no payments. Upgrade users by hand with `UPDATE "User" SET plan = 'PRO' WHERE email = '...';`
-- AI calls run inside the request (no queue), so a capture takes a few seconds while Claude thinks.
-- If you revoke the GitHub token, sign out and back in to refresh it.
+## Known limitations
+
+- AI calls run inside the request; there is no job queue. A capture takes a few seconds.
+- Voice input depends on browser support (Chrome, Edge and Safari; not Firefox).
+- The Content-Security-Policy allows `'unsafe-inline'` scripts, because Next.js inlines its bootstrap scripts. Move to nonces if you need a stricter CSP.
