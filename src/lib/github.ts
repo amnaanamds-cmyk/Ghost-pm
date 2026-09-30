@@ -1,6 +1,7 @@
 import "server-only";
 import { UserError } from "@/lib/action-result";
 import { db } from "@/lib/db";
+import { decryptSecret } from "@/lib/crypto";
 
 const API = process.env.GITHUB_API_URL || "https://api.github.com";
 
@@ -12,7 +13,7 @@ async function getToken(userId: string) {
     select: { access_token: true },
   });
   if (!account?.access_token) throw new GitHubError("No GitHub token on file — sign out and sign in again.");
-  return account.access_token;
+  return decryptSecret(account.access_token)!;
 }
 
 export async function createIssue(userId: string, repo: string, issue: { title: string; body: string }) {

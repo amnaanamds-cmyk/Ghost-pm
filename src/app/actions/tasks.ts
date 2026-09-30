@@ -7,6 +7,7 @@ import { requireUserId } from "@/lib/session";
 import { getProjectForUser, hasRole, memberOfProject } from "@/lib/workspace";
 import { writeAgentPrompt } from "@/lib/agent-prompt";
 import { createIssue, getIssueState } from "@/lib/github";
+import { enforce } from "@/lib/rate-limit";
 import { actionError, UserError, type ActionResult } from "@/lib/action-result";
 
 async function getOwnedTask(userId: string, taskId: string) {
@@ -25,6 +26,7 @@ export async function pushTaskToGitHub(taskId: string): Promise<ActionResult<{ u
     const task = await getOwnedTask(userId, taskId);
     if (task.githubIssueUrl) return { ok: true, data: { url: task.githubIssueUrl } };
     if (!task.project.githubRepo) return { ok: false, error: "Add a GitHub repo to this project first." };
+    await enforce("githubPush", userId);
 
     const agentPrompt = task.agentPrompt ?? (await writeAgentPrompt(task));
     const body = [
@@ -161,6 +163,7 @@ export async function addComment(taskId: string, body: string): Promise<ActionRe
     const userId = await requireUserId();
     await getOwnedTask(userId, taskId);
     const text = z.string().trim().min(1, "Comment is empty").max(5000).parse(body);
+    await enforce("comment", userId);
     await db.taskComment.create({ data: { taskId, authorId: userId, body: text } });
     return { ok: true };
   } catch (e) {
@@ -198,6 +201,7 @@ export async function syncGitHubIssues(projectId: string): Promise<ActionResult<
   try {
     const userId = await requireUserId();
     await getProjectForUser(userId, projectId);
+    await enforce("githubSync", userId);
     const tasks = await db.task.findMany({
       where: { projectId, githubIssueUrl: { not: null }, status: { not: "done" } },
       select: { id: true, githubIssueUrl: true },

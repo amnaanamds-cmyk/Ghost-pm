@@ -247,3 +247,10 @@ model WebhookEvent {
 
   @@index([provider, createdAt])
 }
+
+// Fixed-window rate limiting (Postgres-backed so it works across serverless instances).
+model RateLimit {
+  key         String   @id
+  windowStart DateTime
+  count       Int
+}

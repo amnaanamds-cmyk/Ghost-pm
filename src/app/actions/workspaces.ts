@@ -13,6 +13,7 @@ import { actionError, UserError, type ActionResult } from "@/lib/action-result";
 import { hasLiveSubscription, syncSeats } from "@/lib/billing";
 import { deleteImages, imageRefsFor } from "@/lib/storage";
 import { inviteEmail, sendEmail } from "@/lib/email";
+import { enforce } from "@/lib/rate-limit";
 
 const INVITE_TTL_DAYS = 7;
 const nameSchema = z.string().trim().min(1, "Name is required").max(60);
@@ -98,6 +99,7 @@ export async function createInvite(
   try {
     const { userId, workspace, membership } = await requireWorkspace();
     assertRole(membership, "ADMIN");
+    await enforce("invite", userId);
     const { email, role } = inviteSchema.parse(input);
     const invite = await db.invite.create({
       data: {

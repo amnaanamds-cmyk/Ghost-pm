@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { hit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { tasksToCsv, tasksToMarkdown } from "@/lib/export";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  if (!(await hit("export", session.user.id))) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   const { id } = await params;
   const project = await db.project.findFirst({
     where: { id, workspace: { members: { some: { userId: session.user.id } } } },

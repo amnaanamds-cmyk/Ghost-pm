@@ -5,6 +5,7 @@ import { describeAIError, streamText } from "@/lib/ai";
 import { agentPromptContent } from "@/lib/agent-prompt";
 import { AGENT_PROMPT_SYSTEM } from "@/lib/prompts";
 import { memberOfProject } from "@/lib/workspace";
+import { hit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -19,6 +20,9 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     include: { project: true, capture: true },
   });
   if (!task) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+  if (!(await hit("agentPrompt", session.user.id))) {
+    return NextResponse.json({ error: "You're doing that too fast — please wait a minute." }, { status: 429 });
+  }
 
   let stream: ReturnType<typeof streamText>;
   try {

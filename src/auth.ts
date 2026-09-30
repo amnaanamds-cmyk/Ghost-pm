@@ -3,9 +3,21 @@ import GitHub from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "@/lib/db";
 import { sendEmail, welcomeEmail } from "@/lib/email";
+import { encryptSecret } from "@/lib/crypto";
+
+const baseAdapter = PrismaAdapter(db);
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(db),
+  adapter: {
+    ...baseAdapter,
+    // Encrypt OAuth tokens before the adapter stores them.
+    linkAccount: (account) =>
+      baseAdapter.linkAccount!({
+        ...account,
+        access_token: encryptSecret(account.access_token) ?? undefined,
+        refresh_token: encryptSecret(account.refresh_token) ?? undefined,
+      }),
+  },
   session: { strategy: "database" },
   providers: [
     GitHub({
@@ -54,11 +66,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       await db.account.updateMany({
         where: { provider: "github", providerAccountId: account.providerAccountId },
         data: {
-          access_token: account.access_token,
+          access_token: encryptSecret(account.access_token),
           scope: account.scope,
           token_type: account.token_type,
           expires_at: account.expires_at,
-          refresh_token: account.refresh_token,
+          refresh_token: encryptSecret(account.refresh_token),
         },
       });
       const login = (profile as { login?: string } | undefined)?.login;

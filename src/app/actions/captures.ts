@@ -10,6 +10,7 @@ import { LimitError } from "@/lib/limits";
 import * as Sentry from "@sentry/nextjs";
 import { describeAIError } from "@/lib/ai";
 import { storeImage } from "@/lib/storage";
+import { enforce } from "@/lib/rate-limit";
 import { actionError, UserError, type ActionResult } from "@/lib/action-result";
 
 const captureSchema = z
@@ -53,6 +54,7 @@ export async function createCapture(projectId: string, input: CaptureInput): Pro
   try {
     const userId = await requireUserId();
     const { project } = await getProjectForUser(userId, projectId);
+    await enforce("capture", userId);
     const parsed = captureSchema.safeParse(input);
     if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid capture" };
     const { text, imageUrl, usedVoice } = parsed.data;
@@ -80,6 +82,7 @@ export async function reorganizeCapture(captureId: string): Promise<ActionResult
     const userId = await requireUserId();
     const capture = await db.capture.findFirst({ where: { id: captureId, ...memberOfProject(userId) } });
     if (!capture) return { ok: false, error: "Capture not found" };
+    await enforce("capture", userId);
     const outcome = await runOrganizer(capture.id);
     revalidatePath(`/projects/${capture.projectId}`);
     return { ok: true, data: { captureId, ...outcome } };

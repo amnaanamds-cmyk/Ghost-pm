@@ -42,8 +42,16 @@ export async function assertCanCreateTasks(workspaceId: string) {
   return usage;
 }
 
-/** Records `count` new tasks against the workspace's monthly quota. */
+/**
+ * Records `count` new tasks against the workspace's monthly quota. Period-aware and atomic: if the
+ * stored period is stale (or unset), the counter restarts at `count` for the current month.
+ */
 export async function recordTasks(workspaceId: string, count: number) {
-  if (count > 0)
-    await db.workspace.update({ where: { id: workspaceId }, data: { tasksThisPeriod: { increment: count } } });
+  if (count <= 0) return;
+  const period = currentPeriod();
+  await db.$executeRaw`
+    UPDATE "Workspace" SET
+      "tasksThisPeriod" = CASE WHEN "usagePeriod" = ${period} THEN "tasksThisPeriod" + ${count} ELSE ${count} END,
+      "usagePeriod" = ${period}
+    WHERE "id" = ${workspaceId}`;
 }
