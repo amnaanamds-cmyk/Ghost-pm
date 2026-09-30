@@ -49,6 +49,11 @@ export function effectivePlan(ws: Pick<Workspace, "plan" | "subscriptionStatus" 
   return "PRO";
 }
 
+/** A paid Lemon Squeezy subscription that will keep renewing (must be cancelled before deleting). */
+export function hasLiveSubscription(ws: Pick<Workspace, "lsSubscriptionId" | "subscriptionStatus">) {
+  return Boolean(ws.lsSubscriptionId) && !["cancelled", "expired"].includes(ws.subscriptionStatus ?? "");
+}
+
 export const seatCount = (workspaceId: string) => db.membership.count({ where: { workspaceId } });
 
 // ---------- Checkout & portal ----------

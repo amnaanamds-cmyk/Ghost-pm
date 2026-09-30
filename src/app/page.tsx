@@ -6,6 +6,7 @@ import { SignInButton } from "@/components/sign-in-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { SiteFooter } from "@/components/site-footer";
 import { FREE_TASK_LIMIT } from "@/lib/limits";
 import { PRO_PRICE_PER_SEAT } from "@/lib/billing";
 
@@ -113,10 +114,7 @@ export default async function Home() {
         </section>
       </main>
 
-      <footer className="text-muted-foreground mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-8 text-xs">
-        <span>© {new Date().getFullYear()} Ghost PM</span>
-        <span>Built for people who ship.</span>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

@@ -10,7 +10,7 @@ import { requireUserId } from "@/lib/session";
 import { appUrl } from "@/lib/url";
 import { WORKSPACE_COOKIE, assertRole, requireWorkspace, ForbiddenError } from "@/lib/workspace";
 import { actionError, UserError, type ActionResult } from "@/lib/action-result";
-import { effectivePlan, syncSeats } from "@/lib/billing";
+import { hasLiveSubscription, syncSeats } from "@/lib/billing";
 import { deleteImages, imageRefsFor } from "@/lib/storage";
 import { inviteEmail, sendEmail } from "@/lib/email";
 
@@ -71,7 +71,7 @@ export async function deleteWorkspace(): Promise<ActionResult> {
     const { workspace, membership } = await requireWorkspace();
     assertRole(membership, "OWNER");
     if (workspace.personal) return { ok: false, error: "Your personal workspace can't be deleted." };
-    if (effectivePlan(workspace) === "PRO" && workspace.subscriptionStatus !== "cancelled") {
+    if (hasLiveSubscription(workspace)) {
       return { ok: false, error: "Cancel the Pro subscription (Settings → Billing) before deleting." };
     }
     const images = await imageRefsFor({ workspaceId: workspace.id });

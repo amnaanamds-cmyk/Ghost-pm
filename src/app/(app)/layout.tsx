@@ -6,12 +6,15 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
 import { WorkspaceSwitcher } from "@/components/workspace/workspace-switcher";
 import { listMyWorkspaces, requireWorkspace } from "@/lib/workspace";
+import { db } from "@/lib/db";
+import { isAdmin } from "@/lib/admin";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   if (!session?.user) redirect("/");
   const { userId, workspace } = await requireWorkspace();
   const workspaces = (await listMyWorkspaces(userId)).map((m) => m.workspace);
+  const me = await db.user.findUnique({ where: { id: userId }, select: { email: true, githubLogin: true } });
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -30,7 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
           <div className="flex items-center gap-1">
             <ThemeToggle />
-            <UserMenu name={session.user.name} image={session.user.image} />
+            <UserMenu name={session.user.name} image={session.user.image} email={me?.email} admin={!!me && isAdmin(me)} />
           </div>
         </div>
       </header>
