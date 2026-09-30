@@ -9,7 +9,7 @@ import { DeleteProjectButton } from "@/components/projects/delete-project-button
 import { CaptureBox } from "@/components/capture/capture-box";
 import { db } from "@/lib/db";
 import { RetryOrganizeButton } from "@/components/capture/retry-organize-button";
-import { TaskList } from "@/components/tasks/task-list";
+import { TaskBoard } from "@/components/tasks/task-board";
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -24,6 +24,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   const tasks = await db.task.findMany({
     where: { projectId: id },
     orderBy: [{ priority: "asc" }, { createdAt: "desc" }],
+    select: { id: true, title: true, why: true, priority: true, status: true, agentPrompt: true, githubIssueUrl: true },
   });
 
   return (
@@ -65,12 +66,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
       <CaptureBox projectId={project.id} />
 
-      {tasks.length > 0 && (
-        <section className="space-y-2">
-          <h2 className="text-muted-foreground text-sm font-medium">Tasks</h2>
-          <TaskList tasks={tasks} />
-        </section>
-      )}
+      <TaskBoard tasks={tasks} />
 
       {captures.length > 0 && (
         <section className="space-y-2">
