@@ -1,4 +1,5 @@
 import "server-only";
+import { UserError } from "@/lib/action-result";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
@@ -11,7 +12,7 @@ export const WORKSPACE_COOKIE = "gpm_ws";
 const RANK: Record<Role, number> = { MEMBER: 0, ADMIN: 1, OWNER: 2 };
 export const hasRole = (role: Role, min: Role) => RANK[role] >= RANK[min];
 
-export class ForbiddenError extends Error {
+export class ForbiddenError extends UserError {
   constructor(message = "You don't have permission to do that.") {
     super(message);
   }

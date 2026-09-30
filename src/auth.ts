@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "@/lib/db";
+import { sendEmail, welcomeEmail } from "@/lib/email";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(db),
@@ -39,6 +40,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           members: { create: { userId: user.id, role: "OWNER" } },
         },
       });
+      if (user.email) {
+        const base = (process.env.APP_URL || process.env.AUTH_URL || "http://localhost:3000").replace(/\/$/, "");
+        await sendEmail({ to: user.email, ...welcomeEmail({ name: user.name, appUrl: base }) }).catch((e) =>
+          console.error("welcome email failed", e)
+        );
+      }
     },
     // The Prisma adapter only stores tokens on first link; refresh them on every sign-in
     // so a re-login (e.g. after granting new scopes) gives us a working token.

@@ -9,8 +9,10 @@ import { db } from "@/lib/db";
 import { requireUserId } from "@/lib/session";
 import { appUrl } from "@/lib/url";
 import { WORKSPACE_COOKIE, assertRole, requireWorkspace, ForbiddenError } from "@/lib/workspace";
-import { actionError, type ActionResult } from "@/lib/action-result";
+import { actionError, UserError, type ActionResult } from "@/lib/action-result";
 import { effectivePlan, syncSeats } from "@/lib/billing";
+import { deleteImages, imageRefsFor } from "@/lib/storage";
+import { inviteEmail, sendEmail } from "@/lib/email";
 
 const INVITE_TTL_DAYS = 7;
 const nameSchema = z.string().trim().min(1, "Name is required").max(60);
@@ -72,7 +74,9 @@ export async function deleteWorkspace(): Promise<ActionResult> {
     if (effectivePlan(workspace) === "PRO" && workspace.subscriptionStatus !== "cancelled") {
       return { ok: false, error: "Cancel the Pro subscription (Settings → Billing) before deleting." };
     }
+    const images = await imageRefsFor({ workspaceId: workspace.id });
     await db.workspace.delete({ where: { id: workspace.id } });
+    await deleteImages(images);
     (await cookies()).delete(WORKSPACE_COOKIE);
     revalidatePath("/", "layout");
     return { ok: true };
@@ -88,7 +92,9 @@ const inviteSchema = z.object({
   role: z.enum(["ADMIN", "MEMBER"]).default("MEMBER"),
 });
 
-export async function createInvite(input: z.input<typeof inviteSchema>): Promise<ActionResult<{ url: string }>> {
+export async function createInvite(
+  input: z.input<typeof inviteSchema>
+): Promise<ActionResult<{ url: string; emailed: boolean }>> {
   try {
     const { userId, workspace, membership } = await requireWorkspace();
     assertRole(membership, "ADMIN");
@@ -104,8 +110,17 @@ export async function createInvite(input: z.input<typeof inviteSchema>): Promise
       },
     });
     const url = `${await appUrl()}/invite/${invite.token}`;
+    let emailed = false;
+    if (invite.email) {
+      const inviter = await db.user.findUnique({ where: { id: userId }, select: { name: true, githubLogin: true } });
+      const res = await sendEmail({
+        to: invite.email,
+        ...inviteEmail({ inviter: inviter?.name || inviter?.githubLogin || "A teammate", workspace: workspace.name, url }),
+      });
+      emailed = res.sent;
+    }
     revalidatePath("/settings/workspace");
-    return { ok: true, data: { url } };
+    return { ok: true, data: { url, emailed } };
   } catch (e) {
     return actionError(e);
   }
@@ -143,7 +158,7 @@ export async function acceptInvite(token: string): Promise<ActionResult<{ worksp
         where: { id: invite.id, acceptedAt: null },
         data: { acceptedAt: new Date() },
       });
-      if (claimed.count === 0 && !existing) throw new Error("This invite was just used by someone else.");
+      if (claimed.count === 0 && !existing) throw new UserError("This invite was just used by someone else.");
     });
     await setCurrentWorkspace(invite.workspaceId);
     await syncSeats(invite.workspaceId);

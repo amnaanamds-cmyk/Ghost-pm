@@ -16,6 +16,7 @@ model User {
   emailVerified DateTime?
   image         String?
   githubLogin   String?
+  emailDigest   Boolean   @default(true) // weekly digest opt-out
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

@@ -1,4 +1,5 @@
 import "server-only";
+import { UserError } from "@/lib/action-result";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { generateJson } from "@/lib/ai";
@@ -26,7 +27,7 @@ export async function planWeek(projectId: string) {
     orderBy: [{ priority: "asc" }, { createdAt: "asc" }],
     take: 150,
   });
-  if (tasks.length === 0) throw new Error("No open tasks to plan — capture some ideas first.");
+  if (tasks.length === 0) throw new UserError("No open tasks to plan — capture some ideas first.");
 
   const byRef = new Map(tasks.map((t, i) => [`T${i + 1}`, t]));
   const entry = z.object({

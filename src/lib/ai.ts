@@ -1,4 +1,5 @@
 import "server-only";
+import { UserError } from "@/lib/action-result";
 import Anthropic from "@anthropic-ai/sdk";
 import type { z } from "zod";
 
@@ -6,7 +7,7 @@ let client: Anthropic | null = null;
 
 function getClient() {
   if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY is not set — add it to .env to enable AI features.");
+    throw new AIError("ANTHROPIC_API_KEY is not set — add it to .env to enable AI features.");
   }
   client ??= new Anthropic();
   return client;
@@ -14,7 +15,7 @@ function getClient() {
 
 export const model = () => process.env.ANTHROPIC_MODEL || "claude-opus-5-5";
 
-export class AIError extends Error {}
+export class AIError extends UserError {}
 
 function textOf(message: Anthropic.Message) {
   if (message.stop_reason === "refusal") throw new AIError("Claude declined this request.");
@@ -104,11 +105,11 @@ export function streamText(opts: { system: string; content: string | Anthropic.C
 
 /** Maps SDK errors to user-facing messages. */
 export function describeAIError(e: unknown): string {
-  if (e instanceof AIError) return e.message;
+  if (e instanceof UserError) return e.message;
   if (e instanceof Anthropic.AuthenticationError) return "Invalid ANTHROPIC_API_KEY.";
   if (e instanceof Anthropic.RateLimitError) return "Claude is rate limited — try again in a minute.";
   if (e instanceof Anthropic.APIError) return `Claude API error (${e.status ?? "network"}).`;
-  return e instanceof Error ? e.message : "AI request failed";
+  return "AI request failed — please try again.";
 }
 
 /** Convert a stored data URL into a Claude image block. */

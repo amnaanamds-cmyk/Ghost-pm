@@ -6,8 +6,9 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireUserId } from "@/lib/session";
 import { assertRole, getProjectForUser, requireWorkspace } from "@/lib/workspace";
-import { actionError, type ActionResult } from "@/lib/action-result";
+import { actionError, UserError, type ActionResult } from "@/lib/action-result";
 import { listRepos, type RepoSummary } from "@/lib/github";
+import { deleteImages, imageRefsFor } from "@/lib/storage";
 
 const projectSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100),
@@ -25,7 +26,7 @@ export type ProjectInput = z.input<typeof projectSchema>;
 
 function parse(input: ProjectInput) {
   const parsed = projectSchema.safeParse(input);
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Invalid project");
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Invalid project");
   return parsed.data;
 }
 
@@ -61,7 +62,9 @@ export async function deleteProject(id: string): Promise<ActionResult> {
     const { project, membership } = await getProjectForUser(userId, id);
     // Admins can delete any project; members only ones they created.
     if (project.createdById !== userId) assertRole(membership, "ADMIN");
+    const images = await imageRefsFor({ projectId: id });
     await db.project.delete({ where: { id } });
+    await deleteImages(images);
     revalidatePath("/dashboard");
   } catch (e) {
     return actionError(e);

@@ -31,7 +31,7 @@ export function InvitePanel({ invites }: { invites: Invite[] }) {
             if (!res.ok) return void toast.error(res.error);
             setLink(res.data.url);
             form.reset();
-            toast.success("Invite link created");
+            toast.success(res.data.emailed ? "Invite emailed — you can also share the link" : "Invite link created");
           });
         }}
       >

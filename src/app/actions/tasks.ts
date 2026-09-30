@@ -7,14 +7,14 @@ import { requireUserId } from "@/lib/session";
 import { getProjectForUser, hasRole, memberOfProject } from "@/lib/workspace";
 import { writeAgentPrompt } from "@/lib/agent-prompt";
 import { createIssue, getIssueState } from "@/lib/github";
-import { actionError, type ActionResult } from "@/lib/action-result";
+import { actionError, UserError, type ActionResult } from "@/lib/action-result";
 
 async function getOwnedTask(userId: string, taskId: string) {
   const task = await db.task.findFirst({
     where: { id: taskId, ...memberOfProject(userId) },
     include: { project: true, capture: true },
   });
-  if (!task) throw new Error("Task not found");
+  if (!task) throw new UserError("Task not found");
   return task;
 }
 

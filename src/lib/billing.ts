@@ -1,4 +1,5 @@
 import "server-only";
+import { UserError } from "@/lib/action-result";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import {
   createCheckout,
@@ -18,7 +19,7 @@ const env = () => ({
   webhookSecret: process.env.LEMONSQUEEZY_WEBHOOK_SECRET,
 });
 
-export class BillingError extends Error {}
+export class BillingError extends UserError {}
 
 export const billingEnabled = () => {
   const e = env();

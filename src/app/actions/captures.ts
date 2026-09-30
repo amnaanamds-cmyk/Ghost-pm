@@ -7,7 +7,10 @@ import { requireUserId } from "@/lib/session";
 import { getProjectForUser, memberOfProject } from "@/lib/workspace";
 import { organizeCapture } from "@/lib/organize";
 import { LimitError } from "@/lib/limits";
-import { actionError, type ActionResult } from "@/lib/action-result";
+import * as Sentry from "@sentry/nextjs";
+import { describeAIError } from "@/lib/ai";
+import { storeImage } from "@/lib/storage";
+import { actionError, UserError, type ActionResult } from "@/lib/action-result";
 
 const captureSchema = z
   .object({
@@ -40,7 +43,8 @@ async function runOrganizer(captureId: string): Promise<Omit<OrganizeOutcome, "c
   } catch (e) {
     if (e instanceof LimitError) return { taskCount: 0, aiError: e.message, limitReached: true };
     console.error("organizer failed", e);
-    return { taskCount: 0, aiError: e instanceof Error ? e.message : "AI organizer failed" };
+    if (!(e instanceof UserError)) Sentry.captureException(e);
+    return { taskCount: 0, aiError: describeAIError(e) };
   }
 }
 
@@ -48,7 +52,7 @@ async function runOrganizer(captureId: string): Promise<Omit<OrganizeOutcome, "c
 export async function createCapture(projectId: string, input: CaptureInput): Promise<ActionResult<OrganizeOutcome>> {
   try {
     const userId = await requireUserId();
-    await getProjectForUser(userId, projectId);
+    const { project } = await getProjectForUser(userId, projectId);
     const parsed = captureSchema.safeParse(input);
     if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid capture" };
     const { text, imageUrl, usedVoice } = parsed.data;
@@ -56,7 +60,11 @@ export async function createCapture(projectId: string, input: CaptureInput): Pro
     const kinds = [text && (usedVoice ? "voice" : "text"), imageUrl && "image"].filter(Boolean);
     const source = kinds.length > 1 ? "mixed" : (kinds[0] as string);
 
-    const capture = await db.capture.create({ data: { projectId, text, imageUrl, source } });
+    const capture = await db.capture.create({ data: { projectId, text, source } });
+    if (imageUrl) {
+      const stored = await storeImage(imageUrl, `captures/${project.workspaceId}/${capture.id}`);
+      await db.capture.update({ where: { id: capture.id }, data: { imageUrl: stored } });
+    }
     const outcome = await runOrganizer(capture.id);
     revalidatePath(`/projects/${projectId}`);
     revalidatePath("/dashboard");

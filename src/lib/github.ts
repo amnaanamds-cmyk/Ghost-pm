@@ -1,9 +1,10 @@
 import "server-only";
+import { UserError } from "@/lib/action-result";
 import { db } from "@/lib/db";
 
 const API = process.env.GITHUB_API_URL || "https://api.github.com";
 
-export class GitHubError extends Error {}
+export class GitHubError extends UserError {}
 
 async function getToken(userId: string) {
   const account = await db.account.findFirst({

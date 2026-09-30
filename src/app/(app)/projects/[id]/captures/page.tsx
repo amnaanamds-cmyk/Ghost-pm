@@ -72,6 +72,17 @@ export default async function CapturesPage({
                   )}
                 </div>
                 {c.text && <p className="text-sm whitespace-pre-wrap">{c.text}</p>}
+                {c.imageUrl && (
+                  <a href={`/api/captures/${c.id}/image`} target="_blank" rel="noreferrer" className="w-fit">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`/api/captures/${c.id}/image`}
+                      alt="Captured screenshot"
+                      loading="lazy"
+                      className="max-h-48 rounded-md border"
+                    />
+                  </a>
+                )}
                 {c.tasks.length > 0 && (
                   <ul className="space-y-1 border-l-2 pl-3">
                     {c.tasks.map((t) => (

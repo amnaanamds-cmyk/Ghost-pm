@@ -1,10 +1,11 @@
 import "server-only";
+import { UserError } from "@/lib/action-result";
 import { db } from "@/lib/db";
 import { effectivePlan } from "@/lib/billing";
 
 export const FREE_TASK_LIMIT = Number(process.env.FREE_TASKS_PER_MONTH) || 20;
 
-export class LimitError extends Error {}
+export class LimitError extends UserError {}
 
 const currentPeriod = () => new Date().toISOString().slice(0, 7); // "YYYY-MM" UTC
 
