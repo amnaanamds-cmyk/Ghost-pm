@@ -8,6 +8,8 @@ import { ProjectFormDialog } from "@/components/projects/project-form-dialog";
 import { DeleteProjectButton } from "@/components/projects/delete-project-button";
 import { CaptureBox } from "@/components/capture/capture-box";
 import { db } from "@/lib/db";
+import { RetryOrganizeButton } from "@/components/capture/retry-organize-button";
+import { PriorityBadge } from "@/components/tasks/priority-badge";
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -17,7 +19,11 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     where: { projectId: id },
     orderBy: { createdAt: "desc" },
     take: 5,
-    select: { id: true, text: true, source: true, createdAt: true, imageUrl: true },
+    select: { id: true, text: true, source: true, createdAt: true, imageUrl: true, _count: { select: { tasks: true } } },
+  });
+  const tasks = await db.task.findMany({
+    where: { projectId: id },
+    orderBy: [{ priority: "asc" }, { createdAt: "desc" }],
   });
 
   return (
@@ -59,6 +65,23 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
       <CaptureBox projectId={project.id} />
 
+      {tasks.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-muted-foreground text-sm font-medium">Tasks</h2>
+          <ul className="space-y-2">
+            {tasks.map((t) => (
+              <li key={t.id} className="rounded-md border p-3">
+                <div className="flex items-center gap-2">
+                  <PriorityBadge priority={t.priority} />
+                  <span className="font-medium">{t.title}</span>
+                </div>
+                {t.why && <p className="text-muted-foreground mt-1 text-sm">{t.why}</p>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {captures.length > 0 && (
         <section className="space-y-2">
           <h2 className="text-muted-foreground text-sm font-medium">Recent captures</h2>
@@ -67,6 +90,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
               <li key={c.id} className="flex items-start gap-3 rounded-md border p-3 text-sm">
                 <Badge variant="outline">{c.source}</Badge>
                 <span className="line-clamp-2 flex-1">{c.text || (c.imageUrl ? "Screenshot" : "")}</span>
+                {c._count.tasks === 0 && <RetryOrganizeButton captureId={c.id} />}
               </li>
             ))}
           </ul>

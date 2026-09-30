@@ -49,7 +49,10 @@ export function CaptureBox({ projectId }: { projectId: string }) {
     startTransition(async () => {
       const res = await createCapture(projectId, { text, imageUrl: image, usedVoice });
       if (!res.ok) return void toast.error(res.error);
-      toast.success("Captured");
+      const { taskCount, aiError } = res.data;
+      if (aiError) toast.warning("Captured, but the AI organizer failed", { description: aiError });
+      else if (taskCount === 0) toast.info("Captured — nothing actionable found");
+      else toast.success(`Captured → ${taskCount} task${taskCount === 1 ? "" : "s"}`);
       setText("");
       setImage(null);
       setUsedVoice(false);
@@ -124,7 +127,7 @@ export function CaptureBox({ projectId }: { projectId: string }) {
         </div>
         <Button onClick={submit} disabled={pending}>
           {pending ? <Loader2 className="animate-spin" /> : <Send />}
-          {pending ? "Capturing…" : "Capture"}
+          {pending ? "Organizing…" : "Capture"}
         </Button>
       </div>
     </Card>
