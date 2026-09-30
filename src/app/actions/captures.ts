@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireUserId } from "@/lib/session";
-import { getOwnedProject } from "@/lib/projects";
+import { getProjectForUser, memberOfProject } from "@/lib/workspace";
 import { organizeCapture } from "@/lib/organize";
 import { LimitError } from "@/lib/limits";
 import { actionError, type ActionResult } from "@/lib/action-result";
@@ -48,7 +48,7 @@ async function runOrganizer(captureId: string): Promise<Omit<OrganizeOutcome, "c
 export async function createCapture(projectId: string, input: CaptureInput): Promise<ActionResult<OrganizeOutcome>> {
   try {
     const userId = await requireUserId();
-    await getOwnedProject(userId, projectId);
+    await getProjectForUser(userId, projectId);
     const parsed = captureSchema.safeParse(input);
     if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid capture" };
     const { text, imageUrl, usedVoice } = parsed.data;
@@ -70,7 +70,7 @@ export async function createCapture(projectId: string, input: CaptureInput): Pro
 export async function reorganizeCapture(captureId: string): Promise<ActionResult<OrganizeOutcome>> {
   try {
     const userId = await requireUserId();
-    const capture = await db.capture.findFirst({ where: { id: captureId, project: { userId } } });
+    const capture = await db.capture.findFirst({ where: { id: captureId, ...memberOfProject(userId) } });
     if (!capture) return { ok: false, error: "Capture not found" };
     const outcome = await runOrganizer(capture.id);
     revalidatePath(`/projects/${capture.projectId}`);

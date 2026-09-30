@@ -8,7 +8,10 @@ export type TaskView = {
   status: TaskStatus;
   agentPrompt: string | null;
   githubIssueUrl: string | null;
+  assignee: Person | null;
 };
+
+export type Person = { id: string; name: string | null; image: string | null; githubLogin?: string | null };
 
 export const STATUSES: { id: TaskStatus; label: string }[] = [
   { id: "todo", label: "To do" },

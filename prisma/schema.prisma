@@ -10,22 +10,21 @@ datasource db {
 // ---------- Auth.js tables ----------
 
 model User {
-  id              String    @id @default(cuid())
-  name            String?
-  email           String?   @unique
-  emailVerified   DateTime?
-  image           String?
-  githubLogin     String?
-  plan            Plan      @default(FREE)
-  // Monthly AI-task usage for plan limits. Deleting tasks doesn't refund quota.
-  usagePeriod     String? // "YYYY-MM" (UTC)
-  tasksThisPeriod Int       @default(0)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  githubLogin   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  accounts Account[]
-  sessions Session[]
-  projects Project[]
+  accounts        Account[]
+  sessions        Session[]
+  memberships     Membership[]
+  projectsCreated Project[]    @relation("ProjectCreator")
+  tasksAssigned   Task[]       @relation("TaskAssignee")
+  invitesSent     Invite[]     @relation("InviteSender")
 }
 
 model Account {
@@ -67,6 +66,61 @@ model VerificationToken {
   @@id([identifier, token])
 }
 
+// ---------- Workspaces ----------
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+model Workspace {
+  id              String   @id @default(cuid())
+  name            String
+  personal        Boolean  @default(false)
+  plan            Plan     @default(FREE)
+  // Monthly AI-task usage for plan limits. Deleting tasks doesn't refund quota.
+  usagePeriod     String? // "YYYY-MM" (UTC)
+  tasksThisPeriod Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  members  Membership[]
+  invites  Invite[]
+  projects Project[]
+}
+
+model Membership {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        Role     @default(MEMBER)
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+model Invite {
+  id          String    @id @default(cuid())
+  workspaceId String
+  email       String?
+  role        Role      @default(MEMBER)
+  token       String    @unique
+  invitedById String?
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedBy User?     @relation("InviteSender", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+}
+
 // ---------- Ghost PM ----------
 
 enum Plan {
@@ -89,7 +143,8 @@ enum TaskStatus {
 
 model Project {
   id          String   @id @default(cuid())
-  userId      String
+  workspaceId String
+  createdById String?
   name        String
   description String   @default("")
   techStack   String   @default("")
@@ -97,12 +152,13 @@ model Project {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  captures Capture[]
-  tasks    Task[]
-  roadmaps Roadmap[]
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy User?     @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  captures  Capture[]
+  tasks     Task[]
+  roadmaps  Roadmap[]
 
-  @@index([userId])
+  @@index([workspaceId])
 }
 
 model Capture {
@@ -123,6 +179,7 @@ model Task {
   id             String     @id @default(cuid())
   projectId      String
   captureId      String?
+  assigneeId     String?
   title          String
   why            String     @default("")
   priority       Priority   @default(P2)
@@ -132,8 +189,9 @@ model Task {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
-  project Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  capture Capture? @relation(fields: [captureId], references: [id], onDelete: SetNull)
+  project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  capture  Capture? @relation(fields: [captureId], references: [id], onDelete: SetNull)
+  assignee User?    @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
 
   @@index([projectId, status])
   @@index([createdAt])

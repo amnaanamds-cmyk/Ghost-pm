@@ -32,9 +32,9 @@ export async function organizeCapture(captureId: string): Promise<{ created: num
     where: { id: captureId },
     include: { project: true },
   });
-  const userId = capture.project.userId;
+  const workspaceId = capture.project.workspaceId;
   // Check before calling Claude so capped users don't cost API spend.
-  await assertCanCreateTasks(userId);
+  await assertCanCreateTasks(workspaceId);
 
   const openTasks = await db.task.findMany({
     where: { projectId: capture.projectId, status: { not: "done" } },
@@ -66,11 +66,11 @@ export async function organizeCapture(captureId: string): Promise<{ created: num
   const tasks = await generateJson({ system: ORGANIZER_SYSTEM, content, schema: organizedTasksSchema });
 
   // Re-check: another capture may have used quota while Claude was thinking.
-  const { remaining } = await assertCanCreateTasks(userId).catch(() => ({ remaining: 0 }));
+  const { remaining } = await assertCanCreateTasks(workspaceId).catch(() => ({ remaining: 0 }));
   const kept = tasks.slice(0, remaining);
   await db.task.createMany({
     data: kept.map((t) => ({ ...t, projectId: capture.projectId, captureId: capture.id })),
   });
-  await recordTasks(userId, kept.length);
+  await recordTasks(workspaceId, kept.length);
   return { created: kept.length, dropped: tasks.length - kept.length };
 }

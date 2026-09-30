@@ -20,9 +20,18 @@ import { cn } from "@/lib/utils";
 import { PriorityBadge } from "./priority-badge";
 import { TaskDialog } from "./task-dialog";
 import { GitHubButton } from "./github-button";
-import { PRIORITIES, STATUSES, type TaskView } from "./types";
+import { PRIORITIES, STATUSES, type Person, type TaskView } from "./types";
+import { Avatar } from "@/components/avatar";
 
-export function TaskBoard({ tasks, githubRepo }: { tasks: TaskView[]; githubRepo: string | null }) {
+export function TaskBoard({
+  tasks,
+  githubRepo,
+  members,
+}: {
+  tasks: TaskView[];
+  githubRepo: string | null;
+  members: Person[];
+}) {
   const dndId = useId(); // stable id so dnd-kit aria attributes match between SSR and client
   const [filter, setFilter] = useState<Set<Priority>>(new Set());
   const [openId, setOpenId] = useState<string | null>(null);
@@ -104,6 +113,7 @@ export function TaskBoard({ tasks, githubRepo }: { tasks: TaskView[]; githubRepo
           key={openTask.id}
           task={openTask}
           open
+          members={members}
           onOpenChange={(o) => !o && setOpenId(null)}
           extraActions={
             githubRepo ? <GitHubButton taskId={openTask.id} issueUrl={openTask.githubIssueUrl} /> : undefined
@@ -179,7 +189,7 @@ function TaskCard({ task, onOpen }: { task: TaskView; onOpen: () => void }) {
         </span>
       </div>
       {task.why && <p className="text-muted-foreground mt-1.5 line-clamp-2 text-xs">{task.why}</p>}
-      {(task.agentPrompt || task.githubIssueUrl) && (
+      {(task.agentPrompt || task.githubIssueUrl || task.assignee) && (
         <div className="text-muted-foreground mt-2 flex items-center gap-2 text-xs">
           {task.agentPrompt && (
             <span className="inline-flex items-center gap-1">
@@ -191,6 +201,7 @@ function TaskCard({ task, onOpen }: { task: TaskView; onOpen: () => void }) {
               <ExternalLink className="size-3" /> Issue
             </span>
           )}
+          {task.assignee && <Avatar person={task.assignee} className="ml-auto size-5" />}
         </div>
       )}
     </div>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { FolderPlus, Plus } from "lucide-react";
 import { db } from "@/lib/db";
-import { requireUserId } from "@/lib/session";
+import { requireWorkspace } from "@/lib/workspace";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,10 +10,10 @@ import { UsageMeter } from "@/components/usage-meter";
 import { getUsage } from "@/lib/limits";
 
 export default async function DashboardPage() {
-  const userId = await requireUserId();
-  const usage = await getUsage(userId);
+  const { workspace } = await requireWorkspace();
+  const usage = await getUsage(workspace.id);
   const projects = await db.project.findMany({
-    where: { userId },
+    where: { workspaceId: workspace.id },
     orderBy: { updatedAt: "desc" },
     include: { _count: { select: { tasks: { where: { status: { not: "done" } } } } } },
   });
@@ -22,7 +22,7 @@ export default async function DashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Your projects</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
           <UsageMeter usage={usage} />
         </div>
         <ProjectFormDialog

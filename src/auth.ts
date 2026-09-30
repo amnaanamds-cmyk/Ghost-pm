@@ -29,6 +29,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
   events: {
+    // Every user starts with a personal workspace.
+    async createUser({ user }) {
+      if (!user.id) return;
+      await db.workspace.create({
+        data: {
+          name: `${user.name || "My"}'s workspace`,
+          personal: true,
+          members: { create: { userId: user.id, role: "OWNER" } },
+        },
+      });
+    },
     // The Prisma adapter only stores tokens on first link; refresh them on every sign-in
     // so a re-login (e.g. after granting new scopes) gives us a working token.
     async signIn({ user, account, profile }) {

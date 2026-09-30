@@ -4,13 +4,14 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireUserId } from "@/lib/session";
+import { memberOfProject } from "@/lib/workspace";
 import { writeAgentPrompt } from "@/lib/agent-prompt";
 import { createIssue } from "@/lib/github";
 import { actionError, type ActionResult } from "@/lib/action-result";
 
 async function getOwnedTask(userId: string, taskId: string) {
   const task = await db.task.findFirst({
-    where: { id: taskId, project: { userId } },
+    where: { id: taskId, ...memberOfProject(userId) },
     include: { project: true, capture: true },
   });
   if (!task) throw new Error("Task not found");
@@ -69,7 +70,7 @@ const prioritySchema = z.enum(["P0", "P1", "P2", "P3"]);
 
 export async function updateTask(
   taskId: string,
-  patch: { status?: string; priority?: string; title?: string; why?: string }
+  patch: { status?: string; priority?: string; title?: string; why?: string; assigneeId?: string | null }
 ): Promise<ActionResult> {
   try {
     const userId = await requireUserId();
@@ -80,8 +81,15 @@ export async function updateTask(
         priority: prioritySchema.optional(),
         title: z.string().trim().min(1).max(200).optional(),
         why: z.string().trim().max(2000).optional(),
+        assigneeId: z.string().nullable().optional(),
       })
       .parse(patch);
+    if (data.assigneeId) {
+      const isMember = await db.membership.findUnique({
+        where: { workspaceId_userId: { workspaceId: task.project.workspaceId, userId: data.assigneeId } },
+      });
+      if (!isMember) return { ok: false, error: "Assignee must be a member of this workspace" };
+    }
     await db.task.update({ where: { id: task.id }, data });
     revalidatePath(`/projects/${task.projectId}`);
     return { ok: true };

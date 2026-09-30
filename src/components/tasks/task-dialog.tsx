@@ -9,7 +9,7 @@ import { CopyButton } from "@/components/copy-button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PriorityBadge } from "./priority-badge";
-import { PRIORITIES, STATUSES, type TaskView } from "./types";
+import { PRIORITIES, STATUSES, type Person, type TaskView } from "./types";
 
 const selectClass =
   "border-input dark:bg-input/30 h-8 rounded-md border bg-transparent px-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
@@ -19,8 +19,10 @@ export function TaskDialog({
   open,
   onOpenChange,
   extraActions,
+  members,
 }: {
   task: TaskView;
+  members: Person[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   extraActions?: React.ReactNode;
@@ -82,6 +84,20 @@ export function TaskDialog({
             {PRIORITIES.map((p) => (
               <option key={p} value={p}>
                 {p}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="Assignee"
+            className={selectClass}
+            value={task.assignee?.id ?? ""}
+            disabled={saving}
+            onChange={(e) => patch({ assigneeId: e.target.value || null })}
+          >
+            <option value="">Unassigned</option>
+            {members.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name || m.githubLogin || "Member"}
               </option>
             ))}
           </select>

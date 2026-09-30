@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireUserId } from "@/lib/session";
-import { getOwnedProject } from "@/lib/projects";
+import { assertRole, getProjectForUser, requireWorkspace } from "@/lib/workspace";
 import { actionError, type ActionResult } from "@/lib/action-result";
 
 const projectSchema = z.object({
@@ -30,8 +30,10 @@ function parse(input: ProjectInput) {
 
 export async function createProject(input: ProjectInput): Promise<ActionResult<{ id: string }>> {
   try {
-    const userId = await requireUserId();
-    const project = await db.project.create({ data: { ...parse(input), userId } });
+    const { userId, workspace } = await requireWorkspace();
+    const project = await db.project.create({
+      data: { ...parse(input), workspaceId: workspace.id, createdById: userId },
+    });
     revalidatePath("/dashboard");
     return { ok: true, data: { id: project.id } };
   } catch (e) {
@@ -42,7 +44,7 @@ export async function createProject(input: ProjectInput): Promise<ActionResult<{
 export async function updateProject(id: string, input: ProjectInput): Promise<ActionResult> {
   try {
     const userId = await requireUserId();
-    await getOwnedProject(userId, id);
+    await getProjectForUser(userId, id);
     await db.project.update({ where: { id }, data: parse(input) });
     revalidatePath(`/projects/${id}`);
     revalidatePath("/dashboard");
@@ -55,7 +57,9 @@ export async function updateProject(id: string, input: ProjectInput): Promise<Ac
 export async function deleteProject(id: string): Promise<ActionResult> {
   try {
     const userId = await requireUserId();
-    await getOwnedProject(userId, id);
+    const { project, membership } = await getProjectForUser(userId, id);
+    // Admins can delete any project; members only ones they created.
+    if (project.createdById !== userId) assertRole(membership, "ADMIN");
     await db.project.delete({ where: { id } });
     revalidatePath("/dashboard");
   } catch (e) {

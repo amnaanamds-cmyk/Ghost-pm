@@ -9,29 +9,29 @@ const currentPeriod = () => new Date().toISOString().slice(0, 7); // "YYYY-MM" U
 
 export type Usage = { plan: "FREE" | "PRO"; used: number; limit: number | null; remaining: number };
 
-/** Current month's task usage, resetting the counter when a new month starts. */
-export async function getUsage(userId: string): Promise<Usage> {
+/** A workspace's task usage this month, resetting the counter when a new month starts. */
+export async function getUsage(workspaceId: string): Promise<Usage> {
   const period = currentPeriod();
-  await db.user.updateMany({
-    where: { id: userId, OR: [{ usagePeriod: null }, { usagePeriod: { not: period } }] },
+  await db.workspace.updateMany({
+    where: { id: workspaceId, OR: [{ usagePeriod: null }, { usagePeriod: { not: period } }] },
     data: { usagePeriod: period, tasksThisPeriod: 0 },
   });
-  const user = await db.user.findUniqueOrThrow({
-    where: { id: userId },
+  const ws = await db.workspace.findUniqueOrThrow({
+    where: { id: workspaceId },
     select: { plan: true, tasksThisPeriod: true },
   });
-  if (user.plan === "PRO") return { plan: "PRO", used: user.tasksThisPeriod, limit: null, remaining: Infinity };
+  if (ws.plan === "PRO") return { plan: "PRO", used: ws.tasksThisPeriod, limit: null, remaining: Infinity };
   return {
     plan: "FREE",
-    used: user.tasksThisPeriod,
+    used: ws.tasksThisPeriod,
     limit: FREE_TASK_LIMIT,
-    remaining: Math.max(0, FREE_TASK_LIMIT - user.tasksThisPeriod),
+    remaining: Math.max(0, FREE_TASK_LIMIT - ws.tasksThisPeriod),
   };
 }
 
-/** Throws a friendly LimitError if the user can't create any more tasks this month. */
-export async function assertCanCreateTasks(userId: string) {
-  const usage = await getUsage(userId);
+/** Throws a friendly LimitError if the workspace can't create any more tasks this month. */
+export async function assertCanCreateTasks(workspaceId: string) {
+  const usage = await getUsage(workspaceId);
   if (usage.remaining <= 0) {
     throw new LimitError(
       `You've used all ${usage.limit} tasks on the Free plan this month. Upgrade to Pro for unlimited tasks.`
@@ -40,7 +40,8 @@ export async function assertCanCreateTasks(userId: string) {
   return usage;
 }
 
-/** Records `count` new tasks against the user's monthly quota. */
-export async function recordTasks(userId: string, count: number) {
-  if (count > 0) await db.user.update({ where: { id: userId }, data: { tasksThisPeriod: { increment: count } } });
+/** Records `count` new tasks against the workspace's monthly quota. */
+export async function recordTasks(workspaceId: string, count: number) {
+  if (count > 0)
+    await db.workspace.update({ where: { id: workspaceId }, data: { tasksThisPeriod: { increment: count } } });
 }

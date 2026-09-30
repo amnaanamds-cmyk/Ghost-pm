@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft, Pencil } from "lucide-react";
 import { requireUserId } from "@/lib/session";
-import { getOwnedProject } from "@/lib/projects";
+import { getProjectForUser } from "@/lib/workspace";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ProjectFormDialog } from "@/components/projects/project-form-dialog";
@@ -18,7 +18,12 @@ import { UsageMeter } from "@/components/usage-meter";
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const userId = await requireUserId();
-  const project = await getOwnedProject(userId, id);
+  const { project, workspace } = await getProjectForUser(userId, id);
+  const members = await db.membership.findMany({
+    where: { workspaceId: workspace.id },
+    orderBy: { createdAt: "asc" },
+    select: { user: { select: { id: true, name: true, image: true, githubLogin: true } } },
+  });
   const captures = await db.capture.findMany({
     where: { projectId: id },
     orderBy: { createdAt: "desc" },
@@ -28,9 +33,18 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   const tasks = await db.task.findMany({
     where: { projectId: id },
     orderBy: [{ priority: "asc" }, { createdAt: "desc" }],
-    select: { id: true, title: true, why: true, priority: true, status: true, agentPrompt: true, githubIssueUrl: true },
+    select: {
+      id: true,
+      title: true,
+      why: true,
+      priority: true,
+      status: true,
+      agentPrompt: true,
+      githubIssueUrl: true,
+      assignee: { select: { id: true, name: true, image: true } },
+    },
   });
-  const usage = await getUsage(userId);
+  const usage = await getUsage(workspace.id);
   const roadmap = await db.roadmap.findFirst({ where: { projectId: id }, orderBy: { createdAt: "desc" } });
 
   return (
@@ -87,7 +101,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         }
       />
 
-      <TaskBoard tasks={tasks} githubRepo={project.githubRepo} />
+      <TaskBoard tasks={tasks} githubRepo={project.githubRepo} members={members.map((m) => m.user)} />
 
       {captures.length > 0 && (
         <section className="space-y-2">
