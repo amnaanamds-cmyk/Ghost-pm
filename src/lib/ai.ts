@@ -82,7 +82,11 @@ export async function generateJson<S extends z.ZodType>(opts: {
 }
 
 /** Plain-text generation (used for agent prompts). */
-export async function generateText(opts: { system: string; content: string; maxTokens?: number }) {
+export async function generateText(opts: {
+  system: string;
+  content: string | Anthropic.ContentBlockParam[];
+  maxTokens?: number;
+}) {
   const text = textOf(await send(opts.system, [{ role: "user", content: opts.content }], opts.maxTokens ?? 8000));
   if (!text) throw new AIError("Claude returned an empty response.");
   return text;

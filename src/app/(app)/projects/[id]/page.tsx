@@ -9,7 +9,7 @@ import { DeleteProjectButton } from "@/components/projects/delete-project-button
 import { CaptureBox } from "@/components/capture/capture-box";
 import { db } from "@/lib/db";
 import { RetryOrganizeButton } from "@/components/capture/retry-organize-button";
-import { PriorityBadge } from "@/components/tasks/priority-badge";
+import { TaskList } from "@/components/tasks/task-list";
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -68,17 +68,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       {tasks.length > 0 && (
         <section className="space-y-2">
           <h2 className="text-muted-foreground text-sm font-medium">Tasks</h2>
-          <ul className="space-y-2">
-            {tasks.map((t) => (
-              <li key={t.id} className="rounded-md border p-3">
-                <div className="flex items-center gap-2">
-                  <PriorityBadge priority={t.priority} />
-                  <span className="font-medium">{t.title}</span>
-                </div>
-                {t.why && <p className="text-muted-foreground mt-1 text-sm">{t.why}</p>}
-              </li>
-            ))}
-          </ul>
+          <TaskList tasks={tasks} />
         </section>
       )}
 
