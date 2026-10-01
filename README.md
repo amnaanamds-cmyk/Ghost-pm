@@ -43,11 +43,14 @@ Next.js 15 (App Router, TypeScript) · Tailwind v4 · shadcn/ui · Prisma + Post
 **Prerequisites:** Node.js 22+ and Postgres 16. The easiest way to get Postgres is `docker compose up -d db`.
 
 ```bash
-npm install                # also runs `prisma generate`
-cp .env.example .env       # then fill in the required values below
-npm run db:migrate         # create tables
-npm run dev                # http://localhost:3000
+npm install
+npm run setup    # creates .env with fresh secrets, creates and migrates the database, lists what's configured
+npm run dev      # http://localhost:3000
 ```
+
+`npm run setup` turns on **Dev sign-in** (`ENABLE_DEV_LOGIN=true`). You can try the whole app — workspaces, invites, the board — before you register a GitHub OAuth app. Dev sign-in never works in production builds. To use AI features, add `ANTHROPIC_API_KEY` to `.env`.
+
+Signed-in admins (`ADMIN_EMAILS`) can see which integrations are configured under **/admin → System status**.
 
 ### Required environment variables
 
@@ -71,7 +74,9 @@ Everything else is optional: billing, storage, email, Sentry, legal details and 
 | `npm run lint` / `npm run typecheck` | ESLint / TypeScript |
 | `npm test` | Unit + integration tests (Vitest; needs Postgres, uses `ghostpm_test`) |
 | `npm run test:e2e` | Playwright end-to-end tests against the production build (run `npm run build` first; uses `ghostpm_e2e` and a local mock of Claude/GitHub) |
+| `npm run setup` | One-time local setup (safe to re-run; never overwrites `.env`) |
 | `npm run db:migrate` / `npm run db:deploy` | Prisma migrations (dev / production) |
+| `GITHUB_TEST_TOKEN=$(gh auth token) npm test -- github-live` | Optional read-only checks against the real GitHub API |
 
 ## Architecture
 
