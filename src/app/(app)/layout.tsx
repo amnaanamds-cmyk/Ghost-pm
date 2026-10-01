@@ -9,6 +9,10 @@ import { listMyWorkspaces, requireWorkspace } from "@/lib/workspace";
 import { db } from "@/lib/db";
 import { isAdmin } from "@/lib/admin";
 
+// Server actions on these pages call Claude (organize, plan week, push to GitHub), which can take
+// well over the default serverless timeout.
+export const maxDuration = 300;
+
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   if (!session?.user) redirect("/");

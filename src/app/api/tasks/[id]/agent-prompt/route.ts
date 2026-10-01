@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { describeAIError, streamText } from "@/lib/ai";
+import { AIError, describeAIError, streamText } from "@/lib/ai";
 import { agentPromptContent } from "@/lib/agent-prompt";
 import { AGENT_PROMPT_SYSTEM } from "@/lib/prompts";
 import { memberOfProject } from "@/lib/workspace";
@@ -43,7 +43,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
           }
         }
         const final = await stream.finalMessage();
-        if (final.stop_reason === "refusal") throw new Error("Claude declined this request.");
+        if (final.stop_reason === "refusal") throw new AIError("Claude declined this request.");
+        if (final.stop_reason === "max_tokens") throw new AIError("The prompt was cut off (output limit reached).");
         if (text.trim()) await db.task.update({ where: { id: task.id }, data: { agentPrompt: text.trim() } });
         controller.close();
       } catch (e) {

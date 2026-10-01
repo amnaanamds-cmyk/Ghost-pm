@@ -43,7 +43,7 @@ http
         res.end(JSON.stringify(data));
       };
 
-      if (req.url === "/v1/messages") {
+      if (req.url.split("?")[0] === "/v1/messages") {
         const text = claudeReply(body);
         if (!body.stream) return json(200, message(text));
         res.writeHead(200, { "content-type": "text/event-stream" });

@@ -5,7 +5,7 @@ const create = vi.fn();
 vi.mock("@anthropic-ai/sdk", async (orig) => {
   const actual = await orig<typeof import("@anthropic-ai/sdk")>();
   class FakeAnthropic {
-    messages = { create };
+    beta = { messages: { create } };
   }
   Object.assign(FakeAnthropic, actual.default);
   return { ...actual, default: FakeAnthropic };
@@ -49,6 +49,28 @@ describe("generateJson", () => {
       /malformed JSON twice/
     );
     expect(create).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports truncated output instead of 'malformed JSON'", async () => {
+    const { generateJson } = await import("@/lib/ai");
+    create.mockResolvedValueOnce(reply('[{"title":"A","prio', "max_tokens"));
+    await expect(generateJson({ system: "s", content: [{ type: "text", text: "x" }], schema })).rejects.toThrow(/cut off/);
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it("requests server-side refusal fallbacks only for supported models", async () => {
+    const { generateText } = await import("@/lib/ai");
+    create.mockResolvedValue(reply("ok"));
+    process.env.ANTHROPIC_MODEL = "claude-opus-5-5";
+    await generateText({ system: "s", content: "x" });
+    expect(create.mock.calls[0][0]).toMatchObject({ fallbacks: "default", betas: ["server-side-fallback-2026-07-01"] });
+    expect(create.mock.calls[0][0].max_tokens).toBeGreaterThanOrEqual(16000);
+
+    process.env.ANTHROPIC_MODEL = "claude-haiku-4-5";
+    await generateText({ system: "s", content: "x" });
+    expect(create.mock.calls[1][0].fallbacks).toBeUndefined();
+    expect(create.mock.calls[1][0].betas).toBeUndefined();
+    delete process.env.ANTHROPIC_MODEL;
   });
 
   it("surfaces refusals", async () => {
