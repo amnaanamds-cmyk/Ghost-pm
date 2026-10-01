@@ -4,6 +4,7 @@ import { effectivePlan, PRO_PRICE_PER_SEAT } from "@/lib/billing";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AdminWorkspaceActions } from "@/components/admin/workspace-actions";
+import { integrations } from "@/lib/config";
 
 export const metadata = { title: "Admin — Ghost PM" };
 
@@ -65,6 +66,29 @@ export default async function AdminPage() {
           </Card>
         ))}
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>System status</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="grid gap-2 text-sm sm:grid-cols-2">
+            {integrations().map((i) => (
+              <li key={i.id} className="flex items-start gap-2" data-integration={i.id} data-enabled={i.enabled}>
+                <span
+                  className={`mt-1.5 size-2 shrink-0 rounded-full ${i.enabled ? "bg-green-500" : i.required ? "bg-red-500" : "bg-muted-foreground/40"}`}
+                />
+                <span className="min-w-0">
+                  <span className="font-medium">{i.name}</span>{" "}
+                  <span className="text-muted-foreground">
+                    {i.enabled ? `— ${i.note}` : `— ${i.required ? "required, " : ""}missing ${i.missing.join(", ")}`}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

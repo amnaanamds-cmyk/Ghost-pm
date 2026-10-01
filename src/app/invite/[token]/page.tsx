@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { GithubIcon } from "@/components/github-icon";
 import { AcceptInviteButton } from "@/components/workspace/accept-invite-button";
+import { DevSignIn } from "@/components/dev-sign-in";
 
 export default async function InvitePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -46,6 +47,9 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
                   <GithubIcon /> Sign in with GitHub to join
                 </Button>
               </form>
+            )}
+            {!session?.user && (
+              <DevSignIn redirectTo={`/invite/${token}`} />
             )}
           </>
         )}

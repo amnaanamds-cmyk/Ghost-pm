@@ -7,6 +7,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { SiteFooter } from "@/components/site-footer";
+import { DevSignIn } from "@/components/dev-sign-in";
+import { githubAuthConfigured } from "@/lib/config";
 import { FREE_TASK_LIMIT } from "@/lib/limits";
 import { PRO_PRICE_PER_SEAT } from "@/lib/billing";
 
@@ -69,7 +71,15 @@ export default async function Home() {
           <p className="text-muted-foreground mx-auto mt-6 max-w-xl text-lg text-balance">
             Your agents can write the code. Ghost PM decides what they should build next — and writes the prompt.
           </p>
-          <div className="mt-8 flex justify-center">{cta}</div>
+          <div className="mt-8 flex flex-col items-center gap-3">
+            {cta}
+            {!signedIn && !githubAuthConfigured() && (
+              <p className="text-muted-foreground text-xs">
+                GitHub sign-in isn&apos;t configured on this server yet (set AUTH_GITHUB_ID / AUTH_GITHUB_SECRET).
+              </p>
+            )}
+            {!signedIn && <DevSignIn />}
+          </div>
         </section>
 
         <section className="mx-auto grid max-w-6xl gap-4 px-4 pb-24 md:grid-cols-3">

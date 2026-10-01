@@ -2,6 +2,12 @@ import * as Sentry from "@sentry/nextjs";
 import { privacySafeDataCollection } from "@/lib/sentry-options";
 
 export async function register() {
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    const { integrations } = await import("@/lib/config");
+    for (const i of integrations()) {
+      if (!i.enabled && i.required) console.warn(`[ghost-pm] ${i.name} is not configured — missing ${i.missing.join(", ")}`);
+    }
+  }
   const dsn = process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN;
   if (!dsn) return;
   Sentry.init({
